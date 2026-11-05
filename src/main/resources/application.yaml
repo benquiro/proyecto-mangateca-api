@@ -22,6 +22,13 @@ spring:
         schema-initialization:
           enabled: false
 
+mangateca:
+  identity:
+    access-token-ttl: PT15M
+    refresh-token-ttl: P7D
+    refresh-cookie:
+      same-site: Strict
+
 management:
   endpoints:
     web:

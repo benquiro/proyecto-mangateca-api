@@ -6,3 +6,6 @@ spring:
 mangateca:
   cors:
     allowed-origins: http://localhost:5173
+  identity:
+    jwt:
+      issuer: http://localhost:8080
