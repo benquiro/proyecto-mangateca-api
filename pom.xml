@@ -175,6 +175,13 @@
 						<goals>
 							<goal>build-info</goal>
 						</goals>
+						<configuration>
+							<excludeInfoProperties>
+								<infoProperty>artifact</infoProperty>
+								<infoProperty>group</infoProperty>
+								<infoProperty>time</infoProperty>
+							</excludeInfoProperties>
+						</configuration>
 					</execution>
 				</executions>
 				<configuration>

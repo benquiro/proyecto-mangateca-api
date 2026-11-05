@@ -30,7 +30,7 @@ class ActuatorAndDocsIT {
 	private RestTestClient client;
 
 	@Test
-	@DisplayName("FR-024: health público con db UP y sin detalles")
+	@DisplayName("FR-025: health público con db UP y sin detalles")
 	void healthIsPublicAndMinimal() {
 		JsonNode body = get("/actuator/health");
 
@@ -40,12 +40,13 @@ class ActuatorAndDocsIT {
 	}
 
 	@Test
-	@DisplayName("FR-025: info público con build name/version y sin java, os ni env")
+	@DisplayName("FR-024: info público con build name/version y sin java, os ni env")
 	void infoExposesOnlyBuild() {
 		JsonNode body = get("/actuator/info");
 
 		assertThat(body.path("build").path("name").asString()).isNotBlank();
 		assertThat(body.path("build").path("version").asString()).isNotBlank();
+		assertThat(body.path("build").propertyNames()).containsExactlyInAnyOrder("name", "version");
 		assertThat(body.has("java")).isFalse();
 		assertThat(body.has("os")).isFalse();
 		assertThat(body.has("env")).isFalse();
