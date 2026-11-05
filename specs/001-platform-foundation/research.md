@@ -113,6 +113,13 @@ Principio III.
   Principio V); HMAC con secreto compartido (descartado: obligaría a distribuir un secreto a
   cada verificador); clave pública de dev versionada (descartado: sin su privada no aporta
   nada y añade un archivo).
+- **CSRF**: desactivado en la `SecurityFilterChain`. La credencial viaja solo en la cabecera
+  `Authorization`, que el navegador no adjunta automáticamente en una petición de otro sitio, así
+  que no hay superficie CSRF. Con CSRF activo, un `POST` sin credenciales recibiría 403 (fallo de
+  CSRF) en lugar de 401, lo que incumple SC-004 y FR-020.
+  **Deuda registrada** (ADR-003): `allowCredentials=true` (R11) prepara la cookie del refresh
+  token. El módulo identity MUST reevaluar la protección CSRF de ese endpoint (p. ej.
+  `SameSite=Strict` y CSRF limitado a esa ruta) antes de emitir cookies.
 
 ## R9. Errores con Problem Details (RFC 9457)
 
@@ -132,13 +139,32 @@ Principio III.
 - **Alternatives considered**: `spring.mvc.problemdetails.enabled=true` sin advice propio
   (descartado: no permite el 500 genérico ni la extensión `errors`); URIs `type` propias por
   error (descartado por YAGNI, se podrán añadir por módulo).
+- **Errores fuera de MVC** (FR-015: "Toda respuesta de error"): una excepción lanzada en un
+  filtro, o cualquier `sendError` del contenedor, termina en un *error dispatch* a `/error`, que el
+  advice no ve. Lo atendería `BasicErrorController`, que responde con su propio JSON
+  (`timestamp`, `path`…), no con Problem Details.
+  - **Decision**: `ProblemDetailsErrorController`, un `@RestController` concreto que implementa
+    `ErrorController` de Boot (al existir, Boot no registra `BasicErrorController`). Responde
+    Problem Details a partir de `jakarta.servlet.error.status_code` y
+    `jakarta.servlet.error.request_uri`, sin usar nunca el mensaje ni la excepción en la
+    respuesta. Los textos de `detail` se comparten con `GlobalExceptionHandler`. La
+    `SecurityFilterChain` permite el `DispatcherType.ERROR` (la petición original ya pasó la
+    autorización); sin eso, el error se convertiría en un 401.
+  - **Alternatives considered**: un `ErrorAttributes` propio (descartado: sigue sin producir
+    `application/problem+json` ni la forma de RFC 9457); acotar FR-015 a los errores de MVC
+    (descartado: deja respuestas no estándar al cliente SPA).
 
 ## R10. 401/403 en Problem Details
 
-- **Decision**: `ProblemDetailsAuthenticationEntryPoint` (delega en
-  `BearerTokenAuthenticationEntryPoint` para la cabecera `WWW-Authenticate` y luego escribe el
-  cuerpo) y `ProblemDetailsAccessDeniedHandler`. Ambos escriben a través de un
-  `ProblemDetailsResponseWriter` común que usa el `JsonMapper` (Jackson 3) del contexto.
+- **Decision**: `ProblemDetailsAuthenticationEntryPoint` (fija la cabecera literal
+  `WWW-Authenticate: Bearer` y escribe el cuerpo) y `ProblemDetailsAccessDeniedHandler`. Ambos
+  escriben a través de un `ProblemDetailsResponseWriter` común que usa el `JsonMapper`
+  (Jackson 3) del contexto.
+- **No se delega en `BearerTokenAuthenticationEntryPoint`**: ante un token inválido añade
+  `error="invalid_token", error_description="…"` con la causa (p. ej. `Jwt expired at …`), lo que
+  incumple el edge case de la spec "sin indicar cuál de las comprobaciones falló". El valor fijo
+  `Bearer` cumple RFC 6750 §3, donde el atributo `error` es opcional, y coincide con
+  contracts/http-surface.md §2.
 - **Rationale**: estos errores ocurren en la cadena de filtros, antes de llegar al
   `DispatcherServlet`, por lo que el advice no los ve.
 - **Detalle**: `anyRequest().authenticated()` hace que una ruta inexistente sin credenciales
@@ -152,8 +178,11 @@ Principio III.
     `allowedOrigins` (por defecto lista vacía). Su constructor compacto rechaza `*` y los
     orígenes que no sean `scheme://host[:port]`, lo que hace fallar el arranque.
   - Un bean `CorsFilter` llamado `corsFilter` usa `ProblemDetailsCorsProcessor`, que extiende
-    `DefaultCorsProcessor` y solo sobrescribe `rejectRequest`. `http.cors()` lo recoge, y el
-    registro automático como filtro de servlet se desactiva para que no se ejecute dos veces.
+    `DefaultCorsProcessor`. Sobrescribe `rejectRequest` para que no escriba nada y
+    `processRequest` para que, si `super` devuelve `false`, escriba el 403 Problem Details con
+    `ProblemDetailsResponseWriter` y los objetos servlet que ya recibe el método (sin estado en
+    el hilo ni casts). `http.cors()` recoge el bean, y su registro automático como filtro de
+    servlet se desactiva para que no se ejecute dos veces.
   - Configuración: `allowCredentials=true` (cookies del refresh token futuro), métodos
     `GET,POST,PUT,PATCH,DELETE` y cabeceras `Authorization, Content-Type`.
 - **Rationale**: sin orígenes configurados no se autoriza ninguno (falla cerrado). El

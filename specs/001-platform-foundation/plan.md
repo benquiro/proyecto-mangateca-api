@@ -42,8 +42,13 @@ y sus fuentes están en [research.md](research.md).
 **Testing**:
 
 - JUnit 5 y AssertJ.
-- Slices: `@WebMvcTest` (errores, seguridad).
-- Integración: `@SpringBootTest` (RANDOM_PORT) + Testcontainers `@ServiceConnection`.
+- Slices: `@WebMvcTest` para errores (`GlobalExceptionHandlerTests`) y para la autorización de
+  controladores (`ProbeSecurityWebMvcTests`, Constitución §VI).
+- Integración: `@SpringBootTest` (RANDOM_PORT) + Testcontainers `@ServiceConnection`, con
+  `RestTestClient` (`@AutoConfigureRestTestClient`) del módulo `spring-boot-resttestclient`, que
+  ya llega de forma transitiva vía `spring-boot-starter-webmvc-test` (sin dependencias nuevas).
+- Surefire ejecuta `**/*Tests.java` y `**/*IT.java` (`<includes>` explícito: por defecto ignora
+  `*IT`).
 - Módulos: `@ApplicationModuleTest`.
 - Arquitectura: `ApplicationModules.verify()`.
 - JWT de prueba firmados con `NimbusJwtEncoder` y un par RSA efímero.
@@ -93,7 +98,7 @@ Docker.
 | VI | Testcontainers real, sin H2 | `postgres:18` con `@ServiceConnection` | ✅ |
 | VI | Mocks solo en I/O | No hay mocks; los JWT son reales firmados con una clave efímera | ✅ |
 | VI | JaCoCo ≥ 80% dominio/aplicación; `-Xlint:all` | R14 (incluye la limitación del conjunto vacío y el riesgo de `processing`) | ✅ |
-| VII | Simplicidad, sin interfaces especulativas | Todas las clases son concretas; las únicas interfaces implementadas son contratos del framework (`AuthenticationEntryPoint`, `AccessDeniedHandler`) | ✅ |
+| VII | Simplicidad, sin interfaces especulativas | Todas las clases son concretas; las únicas interfaces implementadas son contratos del framework (`AuthenticationEntryPoint`, `AccessDeniedHandler`, `ErrorController`) | ✅ |
 | VII | Trade-offs documentados | Ver la sección "Evaluación de trade-offs" | ✅ |
 | Hig. | Secretos por entorno; CORS sin `*`; Actuator `health`/`info`; logs ECS | contracts/configuration.md | ✅ |
 | DoD | Spec, plan y tasks aprobados | La spec está validada; tasks queda para `/speckit-tasks` | ✅ |
@@ -107,7 +112,8 @@ introduce interfaces propias, entidades ni dependencias fuera de las listadas.
 | Elemento | Problema real que resuelve hoy | Alternativa simple descartada | Costo aceptado |
 |----------|--------------------------------|-------------------------------|----------------|
 | `ProblemDetailsResponseWriter` (clase concreta compartida) | El entry point 401, el handler 403 y el rechazo CORS escriben Problem Details fuera de MVC | Duplicar la serialización en 3 clases: tres copias que pueden divergir en `Content-Type` o campos | 1 clase de ~30 líneas |
-| `ProblemDetailsCorsProcessor` + bean `corsFilter` | El rechazo CORS por defecto responde en texto plano e incumple FR-015 | `http.cors(c -> c.configurationSource(..))`, que no deja cambiar el cuerpo del rechazo | 1 subclase con 1 método sobrescrito, más desactivar el auto-registro del filtro |
+| `ProblemDetailsCorsProcessor` + bean `corsFilter` | El rechazo CORS por defecto responde en texto plano e incumple FR-015 | `http.cors(c -> c.configurationSource(..))`, que no deja cambiar el cuerpo del rechazo | 1 subclase con 2 métodos sobrescritos (`rejectRequest` vacío y `processRequest`), más desactivar el auto-registro del filtro |
+| `ProblemDetailsErrorController` | Los errores fuera de MVC (excepción en un filtro, `sendError`) salen en el JSON de `BasicErrorController` e incumplen FR-015 | Acotar FR-015 a MVC, o un `ErrorAttributes` propio que no produce `application/problem+json` | 1 controlador de ~30 líneas y el `permitAll` del `DispatcherType.ERROR` |
 | `CorsProperties` (record con validación) | Hacer fallar el arranque ante `*` u orígenes mal formados (edge cases de la spec) | `@Value` + `split(",")` sin validación: el comodín pasaría en silencio | 1 record |
 | `DevJwtDecoderConfiguration` (`@Profile("dev")`) | El arranque con un único comando necesita un `JwtDecoder` sin claves versionadas | Una clave pública de dev versionada (sin su privada no sirve y añade un archivo) | ~15 líneas; los tokens de dev se invalidan al reiniciar |
 | Extender `ResponseEntityExceptionHandler` | Traducir las 6 excepciones MVC estándar a PD sin reescribirlas | Un advice escrito desde cero, que reimplementaría mapeos ya existentes | Herencia de una clase del framework |
@@ -151,6 +157,7 @@ src/main/java/com/mangateca/api/
     ├── web/
     │   ├── package-info.java
     │   ├── GlobalExceptionHandler.java        # @RestControllerAdvice, extiende ResponseEntityExceptionHandler
+    │   ├── ProblemDetailsErrorController.java # /error → Problem Details (errores fuera de MVC)
     │   └── OpenApiConfiguration.java          # bean OpenAPI con esquema bearerAuth
     └── security/
         ├── package-info.java
@@ -184,8 +191,10 @@ src/test/java/com/mangateca/api/
     ├── PlatformModuleTests.java               # @ApplicationModuleTest
     ├── web/
     │   ├── GlobalExceptionHandlerTests.java   # @WebMvcTest: 400/400+errors/404/405/415/500
+    │   ├── ErrorDispatchIT.java               # excepción en filtro → /error → 500 Problem Details
     │   └── ProbeController.java               # controlador de prueba (solo en test)
     └── security/
+        ├── ProbeSecurityWebMvcTests.java      # @WebMvcTest + SecurityConfiguration: 401/403/200 por rol
         ├── SecurityIT.java                    # 401 (sin/inválido/expirado/otra clave), 403 por rol, rutas públicas
         ├── CorsIT.java                        # origen permitido / no permitido / preflight
         └── CorsPropertiesTests.java           # unitario: rechaza *, mal formados; vacío = ninguno
