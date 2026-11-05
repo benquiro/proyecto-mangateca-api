@@ -42,8 +42,9 @@ y sus fuentes están en [research.md](research.md).
 **Testing**:
 
 - JUnit 5 y AssertJ.
-- Slices: `@WebMvcTest` para errores (`GlobalExceptionHandlerTests`) y para la autorización de
-  controladores (`ProbeSecurityWebMvcTests`, Constitución §VI).
+- Slices: `@WebMvcTest` para errores (`GlobalExceptionHandlerTests`,
+  `ProblemDetailsErrorControllerTests`) y para la autorización de controladores
+  (`ProbeSecurityWebMvcTests`), según la Constitución §VI.
 - Integración: `@SpringBootTest` (RANDOM_PORT) + Testcontainers `@ServiceConnection`, con
   `RestTestClient` (`@AutoConfigureRestTestClient`) del módulo `spring-boot-resttestclient`, que
   ya llega de forma transitiva vía `spring-boot-starter-webmvc-test` (sin dependencias nuevas).
@@ -156,8 +157,8 @@ src/main/java/com/mangateca/api/
     ├── package-info.java                      # @ApplicationModule + @NullMarked
     ├── web/
     │   ├── package-info.java
-    │   ├── GlobalExceptionHandler.java        # @RestControllerAdvice, extiende ResponseEntityExceptionHandler
-    │   ├── ProblemDetailsErrorController.java # /error → Problem Details (errores fuera de MVC)
+    │   ├── GlobalExceptionHandler.java        # @RestControllerAdvice, extiende ResponseEntityExceptionHandler; record anidado FieldErrorItem(field, message)
+    │   ├── ProblemDetailsErrorController.java # /error → Problem Details (errores fuera de MVC), @Hidden en OpenAPI
     │   └── OpenApiConfiguration.java          # bean OpenAPI con esquema bearerAuth
     └── security/
         ├── package-info.java
@@ -182,15 +183,18 @@ src/test/java/com/mangateca/api/
 ├── ModularityTests.java                       # ApplicationModules.verify() + documentación
 ├── persistence/
 │   ├── FlywayMigrationIT.java                 # V1 aplicada; event_publication existe; sin tablas de negocio
-│   └── SchemaDriftIT.java                     # checksum alterado / migración future / entidad sin tabla → fallo de arranque
+│   ├── SchemaDriftIT.java                     # checksum alterado / migración future / entidad sin tabla → fallo de arranque
+│   └── TestDatabaseIsolationIT.java           # postgres 18 efímero de Testcontainers, nunca la base de Compose ni H2
 ├── actuator/
 │   ├── HealthEndpointIT.java                  # público; app + db UP; sin detalles
+│   ├── InfoEndpointIT.java                    # público; solo build.name y build.version
 │   └── HealthDatabaseDownIT.java              # contenedor propio detenido → 503 DOWN
 ├── openapi/OpenApiDocsIT.java                 # /v3/api-docs y swagger-ui públicos
 └── platform/
     ├── PlatformModuleTests.java               # @ApplicationModuleTest
     ├── web/
     │   ├── GlobalExceptionHandlerTests.java   # @WebMvcTest: 400/400+errors/404/405/415/500
+    │   ├── ProblemDetailsErrorControllerTests.java # @WebMvcTest: atributos de error → Problem Details, sin fugas
     │   ├── ErrorDispatchIT.java               # excepción en filtro → /error → 500 Problem Details
     │   └── ProbeController.java               # controlador de prueba (solo en test)
     └── security/

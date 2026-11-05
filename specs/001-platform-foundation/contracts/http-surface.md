@@ -74,6 +74,6 @@ HTTP/1.1 400 Bad Request
 Content-Type: application/problem+json
 
 {"type":"about:blank","title":"Bad Request","status":400,
- "detail":"La petición contiene campos inválidos.","instance":"/api/v1/probe",
+ "detail":"La petición contiene campos inválidos.","instance":"/api/v1/probes",
  "errors":[{"field":"name","message":"no debe estar vacío"}]}
 ```

@@ -18,7 +18,8 @@
     },
     "status": {
       "type": "integer",
-      "enum": [400, 401, 403, 404, 405, 415, 500, 503]
+      "description": "Solo códigos que se responden en Problem Details. El 503 del health DOWN usa el formato propio de Actuator y no está incluido.",
+      "enum": [400, 401, 403, 404, 405, 415, 500]
     },
     "detail": {
       "type": "string",

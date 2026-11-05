@@ -260,9 +260,10 @@ secciones obligatorias.
    compilación sin advertencias).
 2. **Given** cualquiera de esos ADR,
    **When** se lee,
-   **Then** expone el problema, las alternativas descartadas (incluida la opción nativa sin
-   dependencia extra), la compatibilidad con la versión de Java y del framework definidas en
-   la constitución, y el estado de mantenimiento de la herramienta.
+   **Then** contiene las siete secciones obligatorias de FR-001; en particular, expone el
+   problema, las alternativas descartadas (incluida la opción nativa sin dependencia extra), la
+   compatibilidad con la versión de Java y del framework definidas en la constitución, y el
+   estado de mantenimiento de la herramienta.
 
 ---
 
@@ -291,9 +292,11 @@ secciones obligatorias.
 **Decisiones documentadas**
 
 - **FR-001**: El repositorio MUST contener en `docs/adr/` los cinco ADR (ADR-001 a ADR-005)
-  descritos en la User Story 9, cada uno con: problema, alternativas descartadas (incluida la
-  opción nativa sin dependencia extra), compatibilidad con Java 25 / Spring Boot 4 y estado de
-  mantenimiento.
+  descritos en la User Story 9, cada uno con estas siete secciones obligatorias: (1) título,
+  estado y fecha; (2) contexto y problema; (3) alternativas descartadas, incluida la opción
+  nativa sin dependencia extra; (4) decisión, con el artefacto y la versión exactos;
+  (5) compatibilidad con Java 25 / Spring Boot 4; (6) estado de mantenimiento; y
+  (7) consecuencias.
 - **FR-002**: Cada capacidad nueva MUST tener su ADR aceptado antes de incorporarse al build.
 
 **Entorno local**
@@ -307,8 +310,9 @@ secciones obligatorias.
 - **FR-005**: Al arrancar, el sistema MUST aplicar las migraciones pendientes antes de aceptar
   tráfico.
 - **FR-006**: MUST existir una migración inicial V1 que prepare únicamente las capacidades base
-  del motor (extensiones necesarias y almacenamiento del registro de publicación de eventos de
-  dominio) y MUST NOT crear tablas de negocio.
+  del motor (el almacenamiento del registro de publicación de eventos de dominio y solo las
+  extensiones que ese almacenamiento necesite, que en V1 son ninguna, porque usa tipos nativos
+  de PostgreSQL) y MUST NOT crear tablas de negocio ni extensiones especulativas.
 - **FR-007**: El sistema MUST validar que el esquema coincide con el modelo esperado y MUST
   abortar el arranque, con un mensaje que identifique la discrepancia, si no coincide, si falta
   una migración aplicada o si una migración aplicada fue alterada.
@@ -398,7 +402,8 @@ secciones obligatorias.
   no dejan ningún cambio en la base de desarrollo local.
 - **SC-006**: El 100% de los arranques contra un esquema discrepante, con una migración faltante
   o con una migración alterada se abortan antes de atender la primera petición.
-- **SC-007**: Los cinco ADR existen y cada uno cubre las cuatro secciones obligatorias.
+- **SC-007**: Los cinco ADR existen y cada uno cubre las siete secciones obligatorias de
+  FR-001.
 
 ## Assumptions
 
