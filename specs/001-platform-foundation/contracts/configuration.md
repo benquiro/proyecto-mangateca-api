@@ -41,10 +41,14 @@ arranca.
 | `spring.jpa.open-in-view`                                | `false` |
 | `spring.modulith.events.jdbc.schema-initialization.enabled` | `false` |
 | `spring.flyway.clean-disabled`                           | `true`  |
+| `spring.flyway.validate-on-migrate`                      | `true`  |
+| `spring.flyway.ignore-migration-patterns`                | `[]` (vacía a propósito) |
 | `management.endpoints.web.exposure.include`              | `health,info` |
 | `management.endpoint.health.show-details`                | `never` |
 | `management.endpoint.health.show-components`             | `always` |
 | `spring.web.error.include-stacktrace` / `include-message` / `include-binding-errors` | `never` |
 | `logging.structured.format.console`                      | `ecs`   |
+
+> Nota: `spring.flyway.ignore-migration-patterns` queda vacía a propósito porque por defecto Flyway ignora `*:future`; verificado con `SchemaDriftIT` caso 2.
 
 > Nota: `server.error.*` está deprecado (level error) desde Boot 4.0.0 y se reemplaza por `spring.web.error.*`; comprobado en el spring-configuration-metadata.json de Boot 4.1.2.

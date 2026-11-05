@@ -10,6 +10,12 @@ spring:
       include-stacktrace: never
       include-message: never
       include-binding-errors: never
+  flyway:
+    validate-on-migrate: true
+    clean-disabled: true
+    # Lista vacia (forma [], verificada con SchemaDriftIT caso 2): Flyway ignora por defecto
+    # '*:future', y una migracion aplicada que no existe localmente no haria fallar el arranque.
+    ignore-migration-patterns: []
   modulith:
     events:
       jdbc:

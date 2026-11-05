@@ -96,7 +96,7 @@ Docker.
 | V | Deny-by-default + `@PreAuthorize` | `anyRequest().authenticated()`; `@EnableMethodSecurity` activo; el 403 se prueba con una ruta de test que usa `@PreAuthorize` | ✅ |
 | V | Roles `CUSTOMER`/`ADMIN`; aislamiento por identidad | Convención del claim `roles` (contracts/http-surface.md §2) | ✅ |
 | V | Refresh tokens / bcrypt | Fuera de alcance (módulo identity) | — |
-| VI | Testcontainers real, sin H2 | `postgres:18` con `@ServiceConnection` | ✅ |
+| VI | Testcontainers real, sin H2 | `postgres:18` con `@ServiceConnection`; excepción en `SchemaDriftIT`, que usa su propio contenedor sin `@ServiceConnection` (ver Complexity Tracking) | ✅ (con excepción) |
 | VI | Mocks solo en I/O | No hay mocks; los JWT son reales firmados con una clave efímera | ✅ |
 | VI | JaCoCo ≥ 80% dominio/aplicación; `-Xlint:all` | R14 (incluye la limitación del conjunto vacío y el riesgo de `processing`) | ✅ |
 | VII | Simplicidad, sin interfaces especulativas | Todas las clases son concretas; las únicas interfaces implementadas son contratos del framework (`AuthenticationEntryPoint`, `AccessDeniedHandler`, `ErrorController`) | ✅ |
@@ -202,7 +202,13 @@ src/test/java/com/mangateca/api/
         ├── SecurityIT.java                    # 401 (sin/inválido/expirado/otra clave), 403 por rol, rutas públicas
         ├── CorsIT.java                        # origen permitido / no permitido / preflight
         └── CorsPropertiesTests.java           # unitario: rechaza *, mal formados; vacío = ninguno
+
+src/test/java/com/mangateca/drift/             # fuera de com.mangateca.api a propósito (ver nota)
+├── DriftEntity.java                           # entidad JPA sin tabla
+└── DriftEntityConfiguration.java              # registra DriftEntity
 ```
+
+> Nota: `drift/` queda fuera de `com.mangateca.api` para que el `@EntityScan` por defecto no recoja la entidad sin tabla en los demás `@SpringBootTest`. Solo los carga el caso 3 de `SchemaDriftIT`.
 
 **Structure Decision**: un único proyecto Maven (monolito modular). Las clases de
 infraestructura transversal viven en el módulo vertical `platform`. Los subpaquetes `web` y
@@ -240,3 +246,4 @@ Se trata de una **desviación explícita del texto literal del Principio VI** (`
 | Desviación | Por qué | Alternativa descartada |
 |------------|---------|------------------------|
 | `-Xlint:all,-processing` en `default-compile` y `default-testCompile` (solo la categoría `processing`; `failOnWarning` intacto) | La advertencia `No processor claimed any of these annotations` es esperada y no accionable: Lombok y MapStruct no reclaman anotaciones de Spring/JUnit | `@SuppressWarnings` en código: javac no suprime esta advertencia por anotación. Mantener `-Xlint:all` completo: rompería el build sin posibilidad de corrección |
+| `SchemaDriftIT` (T028) usa su propio `PostgreSQLContainer` `postgres:18` y pasa `spring.datasource.url/username/password` a mano, en vez de `@ServiceConnection` (excepción al Principio VI: "Testcontainers con PostgreSQL real vía `@ServiceConnection`") | Arranca la app dos veces con `SpringApplicationBuilder` sobre la misma base mutable; ahí `@ServiceConnection` no aplica. Sigue siendo PostgreSQL real, no H2 | Usar el contenedor compartido: contaminaría el esquema de los demás contextos de test |

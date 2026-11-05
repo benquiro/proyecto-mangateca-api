@@ -15,5 +15,9 @@
       "Read(./.env)",
       "Read(./src/main/resources/application-local.*)"
     ]
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
   }
 }
