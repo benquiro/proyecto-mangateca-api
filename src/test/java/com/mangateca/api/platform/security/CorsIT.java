@@ -39,7 +39,7 @@ class CorsIT {
 	private RestTestClient client;
 
 	@Test
-	@DisplayName("FR-020 / US3 CORS 1: origen permitido recibe cabeceras exactas, credenciales y Vary")
+	@DisplayName("FR-022 / US3 CORS 1: origen permitido recibe cabeceras exactas, credenciales y Vary")
 	void shouldAllowConfiguredOriginOnSimpleRequest() {
 		EntityExchangeResult<String> result = this.client.get()
 			.uri("/actuator/health")
@@ -55,7 +55,7 @@ class CorsIT {
 	}
 
 	@Test
-	@DisplayName("FR-020 / US3 CORS 2: preflight permitido sin token anuncia métodos y cabeceras")
+	@DisplayName("FR-022 / US3 CORS 2: preflight permitido sin token anuncia métodos y cabeceras")
 	void shouldAnswerPreflightWithoutToken() {
 		EntityExchangeResult<String> result = preflight(ALLOWED);
 
@@ -69,7 +69,7 @@ class CorsIT {
 	}
 
 	@Test
-	@DisplayName("FR-020 / US3 CORS 3: origen no permitido en petición simple recibe 403 Problem Details")
+	@DisplayName("FR-022 / US3 CORS 3: origen no permitido en petición simple recibe 403 Problem Details")
 	void shouldRejectUnknownOriginOnSimpleRequest() {
 		EntityExchangeResult<String> result = this.client.get()
 			.uri("/actuator/health")
@@ -81,7 +81,7 @@ class CorsIT {
 	}
 
 	@Test
-	@DisplayName("FR-020 / US3 CORS 4: preflight de origen no permitido recibe 403 Problem Details")
+	@DisplayName("FR-022 / US3 CORS 4: preflight de origen no permitido recibe 403 Problem Details")
 	void shouldRejectUnknownOriginOnPreflight() {
 		assertRejected(preflight(EVIL), "/api/v1/probes");
 	}
@@ -95,7 +95,7 @@ class CorsIT {
 		private RestTestClient nestedClient;
 
 		@Test
-		@DisplayName("FR-020 / US3 CORS 5: cualquier Origin cruzado recibe 403 Problem Details")
+		@DisplayName("FR-022 / US3 CORS 5: cualquier Origin cruzado recibe 403 Problem Details")
 		void shouldRejectAnyCrossOriginWhenNoOriginIsConfigured() {
 			for (String origin : List.of(EVIL, ALLOWED)) {
 				EntityExchangeResult<String> result = this.nestedClient.get()
@@ -109,7 +109,7 @@ class CorsIT {
 		}
 
 		@Test
-		@DisplayName("FR-020 / US3 CORS 5: el preflight sin orígenes configurados recibe 403 Problem Details")
+		@DisplayName("FR-022 / US3 CORS 5: el preflight sin orígenes configurados recibe 403 Problem Details")
 		void shouldRejectPreflightWhenNoOriginIsConfigured() {
 			EntityExchangeResult<String> result = this.nestedClient.options()
 				.uri("/api/v1/probes")

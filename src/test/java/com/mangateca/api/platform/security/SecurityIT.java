@@ -104,7 +104,7 @@ class SecurityIT {
 	}
 
 	@Test
-	@DisplayName("FR-021 / US3 escenario 5: todo 401 es Problem Details sin información interna")
+	@DisplayName("FR-020 / US3 escenario 5: todo 401 es Problem Details sin información interna")
 	void shouldReturnProblemDetailsWithoutInternalInfoOn401() throws JOSEException {
 		for (String path : List.of(PROBES, "/api/v1/no-existe")) {
 			for (String token : Arrays.asList(null, "x.y.z", foreignKeyToken(),
@@ -118,7 +118,7 @@ class SecurityIT {
 	}
 
 	@Test
-	@DisplayName("FR-022 / US3 escenario 6: CUSTOMER recibe 403 Problem Details en ruta de ADMIN")
+	@DisplayName("FR-020 / US3 escenario 6: CUSTOMER recibe 403 Problem Details en ruta de ADMIN")
 	void shouldReturn403ProblemDetailsWhenRoleIsInsufficient() {
 		EntityExchangeResult<String> result = get("/api/v1/probes/admin", token(List.of("CUSTOMER"), 0, 1));
 
@@ -127,7 +127,7 @@ class SecurityIT {
 	}
 
 	@Test
-	@DisplayName("FR-022 / US3 escenario 6: ADMIN recibe 200 en ruta de ADMIN")
+	@DisplayName("FR-020 / US3 escenario 6: ADMIN recibe 200 en ruta de ADMIN")
 	void shouldReturn200WhenRoleIsAdmin() {
 		EntityExchangeResult<String> result = get("/api/v1/probes/admin", token(List.of("ADMIN"), 0, 1));
 
