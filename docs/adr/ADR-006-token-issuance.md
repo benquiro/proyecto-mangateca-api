@@ -63,7 +63,7 @@ Higiene Operacional prohíbe versionar claves de firma y exige inyectarlas por e
    explícito (`Strict` por defecto, configurable) y `Path=/api/v1/auth`. El logout la borra con
    `Max-Age=0`.
 6. **Perfil `test`**: Surefire lo activa con `spring.profiles.active=test` en
-   `systemPropertyVariables` (tarea T003). `issuer` de test va en `src/test/resources/application-test.yaml`,
+   `systemPropertyVariables` (ver pom.xml, maven-surefire-plugin). `issuer` de test va en `src/test/resources/application-test.yaml`,
    sin claves.
 
 No se añade ninguna dependencia: `NimbusJwtEncoder`, `NimbusJwtDecoder` y `RsaKeyConverters` ya

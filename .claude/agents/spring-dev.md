@@ -41,3 +41,4 @@ Entrega al terminar:
 - Archivos creados o modificados.
 - Confirmación de compilación limpia sin advertencias.
 - Decisiones técnicas tomadas o advertencias para el agente de test.
+- NUNCA ejecutes git commit, git add ni ninguna operación que modifique el historial o el staging de git. El usuario hace los commits.

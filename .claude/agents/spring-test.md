@@ -48,3 +48,4 @@ Entrega al terminar:
 - Resultado de la ejecución focalizada (`./mvnw test -Dtest=...`), indicando si el resultado esperado era rojo (test-first) o verde.
 - Firmas mínimas de producción que hayas creado, si las hubo.
 - Bugs o discrepancias detectadas frente a spec.md.
+- NUNCA ejecutes git commit, git add ni ninguna operación que modifique el historial o el staging de git. El usuario hace los commits.
