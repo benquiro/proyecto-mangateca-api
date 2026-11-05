@@ -98,7 +98,9 @@ Palabras clave MUST, MUST NOT, SHOULD, SHOULD NOT, MAY según RFC 2119.
   memoria (H2, etc.) MUST NOT.
 - Mocks MUST restringirse a fronteras de I/O externas (pasarela simulada, `Clock`); entidades,
   records y VOs MUST NOT mockearse.
-- Compilación MUST tener cero advertencias con `-Xlint:all`, tratadas como errores.
+- Compilación MUST tener cero advertencias con `-Xlint:all` y `failOnWarning`, tratadas como
+  errores. Única excepción permitida: la categoría `processing` (`-Xlint:all,-processing`),
+  justificada en ADR; cualquier otra exclusión MUST NOT hacerse.
 
 ### VII. Pragmatismo Arquitectónico (KISS / YAGNI)
 
@@ -156,4 +158,4 @@ Palabras clave MUST, MUST NOT, SHOULD, SHOULD NOT, MAY según RFC 2119.
 - **Cumplimiento**: toda revisión de código (humana o agente `spec-reviewer`) MUST verificar esta
   Constitución; toda complejidad adicional MUST justificarse en `plan.md` según VII.
 
-**Versión**: 2.0.0 | **Estado**: Activo | **Ratificada**: 2026-11-05 | **Última enmienda**: 2026-11-05
+**Versión**: 3.0.0 | **Estado**: Activo | **Ratificada**: 2026-11-05 | **Última enmienda**: 2026-11-05
