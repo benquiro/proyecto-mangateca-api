@@ -27,6 +27,19 @@ management:
     web:
       exposure:
         include: health,info
+  endpoint:
+    health:
+      show-details: never
+      show-components: always
+  info:
+    env:
+      enabled: false
+    java:
+      enabled: false
+    os:
+      enabled: false
+    git:
+      enabled: false
 
 logging:
   structured:
