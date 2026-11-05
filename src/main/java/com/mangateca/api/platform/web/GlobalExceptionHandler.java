@@ -5,8 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -32,11 +33,12 @@ import org.springframework.validation.method.ParameterValidationResult;
  * Traduce los errores de MVC a Problem Details (RFC 9457) con un catalogo de textos generico.
  * Nunca incluye valores rechazados, trazas ni mensajes de excepciones (FR-017, FR-018).
  */
-@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    private static final String INVALID_FIELDS_DETAIL = "La petición contiene campos inválidos.";
+	private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+	private static final String INVALID_FIELDS_DETAIL = "La petición contiene campos inválidos.";
 
 	private static final String INTERNAL_ERROR_DETAIL = "Se produjo un error interno.";
 
