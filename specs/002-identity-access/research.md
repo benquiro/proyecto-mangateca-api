@@ -225,9 +225,24 @@ implementación»**.
 
 ## R10. Manejo de errores y tipos de problema
 
-- **Decision**: `IdentityExceptionHandler` (`@RestControllerAdvice(basePackageClasses = …)`)
-  traduce las excepciones propias de `identity` a `ProblemDetail`. Los errores genéricos
-  (validación, JSON ilegible, 500) los sigue produciendo el `GlobalExceptionHandler` de 001.
+- **Decision**: un único `@RestControllerAdvice` para toda la API, el `GlobalExceptionHandler` de
+  001 (Constitución IV: «Errores MUST unificarse en un `@RestControllerAdvice`»). `identity` no
+  define advice propio:
+  - Las excepciones `EmailAlreadyInUseException`, `InvalidCredentialsException` e
+    `InvalidRefreshTokenException` extienden `org.springframework.web.ErrorResponseException` y
+    construyen su `ProblemDetail` con estado, `type` URN y `detail` constante.
+    `ResponseEntityExceptionHandler`, la base del `GlobalExceptionHandler`, ya las traduce sin
+    conocer su clase.
+  - Cambio genérico en `GlobalExceptionHandler.handleExceptionInternal`: si el `ProblemDetail`
+    trae un `type` distinto de `about:blank`, lo fija una excepción de dominio de un módulo, y se
+    conservan su `type` y su `detail`. Solo se normalizan `title` e `instance`. Con
+    `about:blank`, el comportamiento de 001 no cambia.
+  - `/me` con un usuario inexistente o deshabilitado lanza `ErrorResponseException(UNAUTHORIZED)`
+    con la cabecera `WWW-Authenticate: Bearer`. El handler produce el mismo cuerpo que el entry
+    point de 401 de 001 (`about:blank`, «Se requiere autenticación válida.»).
+  - El formato de correo o el nombre visible, si los rechazan el VO `Email` o la fábrica
+    `User.register` tras pasar Bean Validation, se traducen en el servicio a
+    `ErrorResponseException(BAD_REQUEST)` (400 genérico), nunca a 500.
 
   | Tipo (`type`) | Estado | Cuándo |
   |---------------|--------|--------|
@@ -241,14 +256,28 @@ implementación»**.
   son URN, para no inventar un dominio.
 - **Rationale**: cumple FR-020 y SC-002. Con tipos documentados, el frontend puede decidir sin
   analizar textos.
-- **Alternatives considered**: `about:blank` con solo `status` (el 401 del login y el del refresh no
-  se distinguirían, y el cliente necesita saber si debe pedir la contraseña de nuevo).
+- **Alternatives considered**:
+  - *`about:blank` con solo `status`*: el 401 del login y el del refresh no se distinguirían, y el
+    cliente necesita saber si debe pedir la contraseña de nuevo.
+  - *`@RestControllerAdvice` propio de `identity`* (versión anterior de este plan): viola la
+    unicidad que exige la Constitución IV.
+  - *Mapear las excepciones de `identity` dentro del `GlobalExceptionHandler`*: acoplaría
+    `platform` a tipos internos de `identity` (Principio I).
+- **Costo aceptado**: las excepciones de la capa de aplicación dependen de `spring-web`
+  (`ErrorResponseException`). Es una dependencia de framework, no de otro módulo.
 
 ## R11. Registro: normalización, unicidad y rechazo de `role`
 
 - **Decision**:
-  - `Email` (record VO): `trim()` y minúsculas con `Locale.ROOT`; formato validado en el
-    constructor compacto; máximo 254 caracteres. Se guarda normalizado, y el índice
+  - `RegisterRequest` recorta `email` y `displayName` en su constructor compacto (tolera `null`
+    para que Bean Validation lo reporte). Bean Validation corre sobre el objeto ya construido, así
+    que `@Email` y `@Size` validan el valor recortado: un correo con espacios alrededor se
+    normaliza antes de validar (caso borde de la spec).
+  - `Email` (record VO): `trim()` y minúsculas con `Locale.ROOT`. El constructor compacto aplica
+    una regla mínima, no vacío, ≤254 caracteres, una sola `@` con ambos lados no vacíos y sin
+    espacios, que todo correo aceptado por `@Email` cumple en la práctica. Si aun así la rechaza,
+    ver R10 (400, nunca 500). En el login, un correo que el VO rechaza se trata como inexistente
+    (401 genérico con el hash ficticio). Se guarda normalizado, y el índice
     `UNIQUE (lower(email))` garantiza la unicidad.
   - Carrera: el servicio comprueba primero `existsByEmail`, que cubre el caso común. Para el caso
     concurrente confía en el índice único: `saveAndFlush` dentro de la transacción y
