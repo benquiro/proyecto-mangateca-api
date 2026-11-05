@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: mangateca
+      POSTGRES_USER: mangateca
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - '127.0.0.1::5432'
