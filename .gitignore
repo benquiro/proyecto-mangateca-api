@@ -1,0 +1,79 @@
+### Compiled & Build Outputs (Maven / Gradle) ###
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+.gradle/
+dist/
+nbdist/
+/nbbuild/
+/.nb-gradle/
+HELP.md
+
+### macOS System Files ###
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.TemporaryItems
+.fseventsd
+.VolumeIcon.icns
+
+### AI Agents & Spec-Driven Tooling ###
+# Claude Code / Anthropic
+.claude/
+.claude.json
+CLAUDE.local.md
+
+# Spec-kit & Agent Scratchpads / Caches
+.spec-kit/
+.speckit/
+.specs-cache/
+*.agent.log
+*.prompt.tmp
+
+# Antigravity CLI & Other Agent Tooling
+.agy/
+.aider*
+.cursor/
+.windsurf/
+
+### IDEs & Editors ###
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Eclipse / Spring Tool Suite (STS)
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+
+# NetBeans
+/nbproject/private/
+
+### Logs, Secrets & Runtime Dumps ###
+*.log
+.env
+.env.local
+.env.*.local
+hs_err_pid*
+replay_pid*
