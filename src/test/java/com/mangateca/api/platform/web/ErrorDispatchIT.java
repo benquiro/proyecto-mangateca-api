@@ -4,10 +4,7 @@ import static com.mangateca.api.ProblemDetailsAssertions.assertProblemDetails;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -24,16 +21,12 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
-import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
-import org.springframework.security.oauth2.jwt.JwsHeader;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.web.servlet.client.EntityExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.mangateca.api.TestSecurityConfiguration;
+import com.mangateca.api.TestSecurityConfiguration.TestTokens;
 import com.mangateca.api.TestcontainersConfiguration;
 
 /**
@@ -51,7 +44,7 @@ class ErrorDispatchIT {
 	private RestTestClient client;
 
 	@Autowired
-	private JwtEncoder jwtEncoder;
+	private TestTokens tokens;
 
 	@Test
 	@DisplayName("FR-015 / US4 caso 1: excepcion en un filtro responde 500 Problem Details con la ruta original")
@@ -80,15 +73,7 @@ class ErrorDispatchIT {
 	}
 
 	private String token() {
-		Instant now = Instant.now();
-		JwtClaimsSet claims = JwtClaimsSet.builder()
-			.subject("user-1")
-			.issuedAt(now)
-			.expiresAt(now.plus(1, ChronoUnit.HOURS))
-			.claims(map -> map.putAll(Map.of("roles", List.of("CUSTOMER"))))
-			.build();
-		JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
-		return this.jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+		return this.tokens.token("user-1", List.of("CUSTOMER"));
 	}
 
 	@TestConfiguration(proxyBeanMethods = false)
