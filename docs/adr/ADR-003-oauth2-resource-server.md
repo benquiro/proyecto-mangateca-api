@@ -1,7 +1,29 @@
 # ADR-003: Autenticación stateless con OAuth2 Resource Server (JWT)
 
-- **Estado**: Aceptado
+- **Estado**: Reemplazado parcialmente por ADR-006 (Superseded in part by ADR-006)
 - **Fecha**: 2026-11-05
+
+## Reemplazo parcial
+
+ADR-006 (emisión propia de tokens) reemplaza parcialmente esta decisión desde la feature 002.
+
+**Reemplazado por ADR-006**:
+
+- El origen de la clave pública mediante `spring.security.oauth2.resourceserver.jwt.public-key-location`
+  (y su variable `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION`). Ahora el par de
+  claves y el `JwtDecoder` pertenecen a `identity` y se configuran con `MANGATECA_IDENTITY_JWT_*`.
+- `DevJwtDecoderConfiguration` (decoder efímero solo en `dev`). Se retira: `identity` genera el par
+  efímero en `dev` y `test`.
+- La nota «esta feature no emite tokens»: a partir de la feature 002 la API emite sus propios JWT.
+
+**Sigue vigente**:
+
+- Resource Server nativo de Spring Security.
+- Firma RS256.
+- El starter `spring-boot-starter-security-oauth2-resource-server`.
+- Ninguna librería JWT de terceros.
+
+El resto del texto se conserva como registro histórico de la feature 001.
 
 ## Contexto y problema
 
