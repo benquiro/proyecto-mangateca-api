@@ -246,7 +246,7 @@ falla; retirarlo y comprobar que pasa.
 
 ### Implementation for User Story 6
 
-- [ ] T051 [US6] ⚠️ TEMPORAL, NO COMMITEAR. Ejecutar quickstart §4a: crear `src/main/java/com/mangateca/api/demo/Demo.java` que use `com.mangateca.api.platform.security.CorsProperties`, y `./mvnw verify` → `ModularityTests` falla indicando el módulo origen `demo`, el destino `platform` y el tipo accedido. Revertir con `git checkout -- . && git clean -fd` y confirmar que `./mvnw verify` vuelve a pasar. (El caso del ciclo se omite: no es vital.)
+- [X] T051 [US6] ⚠️ TEMPORAL, NO COMMITEAR. Ejecutar quickstart §4a: crear `src/main/java/com/mangateca/api/demo/Demo.java` que use `com.mangateca.api.platform.security.CorsProperties`, y `./mvnw verify` → `ModularityTests` falla indicando el módulo origen `demo`, el destino `platform` y el tipo accedido. Revertir con `git checkout -- . && git clean -fd` y confirmar que `./mvnw verify` vuelve a pasar. (El caso del ciclo se omite: no es vital.)
 
 **Checkpoint**: US6 verificada.
 
@@ -262,7 +262,7 @@ de cobertura (FR-013 retirado, constitución v2.0.0).
 ### Implementation for User Story 7
 
 - ~~T052 [US7] Añadir `jacoco-maven-plugin` 0.8.16 con regla `LINE COVEREDRATIO` ≥ 0.80.~~ **Retirada (2026-11-05)**: la constitución v2.0.0 elimina el umbral de cobertura obligatorio. No se añade JaCoCo.
-- [ ] T053 [US7] ⚠️ TEMPORAL, NO COMMITEAR. Ejecutar quickstart §4c: añadir en una clase de `src/main` un raw type (`List l = new ArrayList();`) y `./mvnw compile` → falla mostrando la advertencia y `warnings found and -Werror specified` (US7-1). Revertir con `git checkout -- . && git clean -fd` y confirmar que `./mvnw verify` pasa. Si no falla, corregir T010. (La parte de cobertura §4b se retiró el 2026-11-05.)
+- [X] T053 [US7] ⚠️ TEMPORAL, NO COMMITEAR. Ejecutar quickstart §4c: añadir en una clase de `src/main` un raw type (`List l = new ArrayList();`) y `./mvnw compile` → falla mostrando la advertencia y `warnings found and -Werror specified` (US7-1). Revertir con `git checkout -- . && git clean -fd` y confirmar que `./mvnw verify` pasa. Si no falla, corregir T010. (La parte de cobertura §4b se retiró el 2026-11-05.)
 
 **Checkpoint**: US7 verificada.
 
@@ -303,8 +303,8 @@ secciones obligatorias.
 
 ### Implementation for User Story 9
 
-- [ ] T061 [US9] Actualizar `docs/adr/ADR-002-mapstruct.md` y `docs/adr/ADR-005-quality-gate.md` con los resultados reales: compatibilidad verificada de MapStruct 1.6.3 con `--release 25` (T010) y el mensaje de fallo de `-Xlint` obtenido en T053. Si algún ADR cambió de decisión, actualizar "Decisión" y "Consecuencias". (ADR-005 ya registra la retirada de JaCoCo, 2026-11-05.)
-- [ ] T062 [US9] Revisar `docs/adr/ADR-001-spring-modulith.md` … `docs/adr/ADR-005-quality-gate.md` contra la lista de data-model.md §ADR: nombre `ADR-NNN-<slug>.md`, `Estado` `Aceptado`, fecha ISO, y las 7 secciones (Título/Estado/Fecha, Contexto y problema, Alternativas con la opción nativa, Decisión con artefacto y versión exactos que coinciden con `pom.xml`, Compatibilidad Java 25 / Spring Boot 4.1.x, Mantenimiento con última release, cadencia y licencia, Consecuencias). Corregir lo que falte.
+- [X] T061 [US9] Actualizar `docs/adr/ADR-002-mapstruct.md` y `docs/adr/ADR-005-quality-gate.md` con los resultados reales: compatibilidad verificada de MapStruct 1.6.3 con `--release 25` (T010) y el mensaje de fallo de `-Xlint` obtenido en T053. Si algún ADR cambió de decisión, actualizar "Decisión" y "Consecuencias". (ADR-005 ya registra la retirada de JaCoCo, 2026-11-05.)
+- [X] T062 [US9] Revisar `docs/adr/ADR-001-spring-modulith.md` … `docs/adr/ADR-005-quality-gate.md` contra la lista de data-model.md §ADR: nombre `ADR-NNN-<slug>.md`, `Estado` `Aceptado`, fecha ISO, y las 7 secciones (Título/Estado/Fecha, Contexto y problema, Alternativas con la opción nativa, Decisión con artefacto y versión exactos que coinciden con `pom.xml`, Compatibilidad Java 25 / Spring Boot 4.1.x, Mantenimiento con última release, cadencia y licencia, Consecuencias). Corregir lo que falte.
 
 **Checkpoint**: US9 verificada (SC-007).
 
