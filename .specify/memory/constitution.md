@@ -1,34 +1,8 @@
-<!--
-SYNC IMPACT REPORT (temporal; eliminar antes de commitear la constitución)
-- Cambio de versión: (plantilla sin versionar) → 1.0.0
-- Tipo de bump: MAJOR inicial (primera ratificación; no existía versión previa).
-- Principios definidos (plantilla → nuevo título):
-  - [PRINCIPLE_1_NAME] → I. Monolito Modular con Límites Verificados
-  - [PRINCIPLE_2_NAME] → II. Integridad del Dominio
-  - [PRINCIPLE_3_NAME] → III. Stack Estable y Disciplina de Dependencias
-  - [PRINCIPLE_4_NAME] → IV. Persistencia Controlada y Contrato de API
-  - [PRINCIPLE_5_NAME] → V. Seguridad por Defecto
-  - (nuevo)            → VI. Calidad Verificable
-- Secciones añadidas:
-  - Metadatos y Jerarquía Normativa
-  - Higiene Operacional (antes [SECTION_2_NAME])
-  - Flujo de Desarrollo y Definition of Done (antes [SECTION_3_NAME])
-  - Gobernanza (enmiendas, versionado, cumplimiento)
-- Secciones eliminadas: ninguna.
-- Plantillas dependientes: no modificadas (leen la constitución en tiempo de ejecución).
-- TODOs diferidos:
-  - TODO(ADR_DEPENDENCIAS): registrar en docs/adr/ las dependencias exigidas por esta
-    constitución que aún no están en pom.xml: Spring Modulith, MapStruct,
-    spring-boot-starter-oauth2-resource-server y el plugin JaCoCo.
-  - TODO(BUILD_GATES): configurar -Xlint:all + -Werror y el umbral JaCoCo en pom.xml
-    (se realiza en una feature, no en esta enmienda).
--->
-
 # Constitución de Mangateca API
 
 | Campo                    | Valor      |
 |--------------------------|------------|
-| Versión                  | 1.0.0      |
+| Versión                  | 1.1.0      |
 | Estado                   | Activo     |
 | Fecha de ratificación    | 2026-11-05 |
 | Fecha de última enmienda | 2026-11-05 |
@@ -198,6 +172,55 @@ RFC 2119. Cada regla incluye su justificación (*Por qué*).
 - La compilación MUST producir cero advertencias con `-Xlint:all`, tratándolas como errores.
   *Por qué*: las advertencias ignoradas ocultan defectos reales (raw types, deprecaciones).
 
+### VII. Pragmatismo Arquitectónico, SOLID y Control de Complejidad
+
+- **Simplicidad deliberada (KISS y YAGNI)**: toda solución MUST ser la más simple que resuelva
+  el problema actual sin comprometer las invariantes del dominio (Principio II). Diseñar para
+  requisitos futuros hipotéticos que no estén explícitos en el `spec.md` activo MUST NOT
+  hacerse.
+  *Por qué*: el código especulativo encarece el mantenimiento y dificulta la lectura sin
+  aportar valor verificable hoy.
+- **Sin interfaces especulativas**: los servicios y componentes internos de un módulo MUST
+  implementarse como clases concretas. Se MUST NOT extraer una interfaz (patrón
+  `IUserService` → `UserServiceImpl`) salvo que se cumpla al menos una condición:
+  1. Existen 2 o más implementaciones reales en el código actual.
+  2. Es un puerto de salida hacia infraestructura externa o simulada (p. ej. `PaymentGateway`).
+  3. Es la fachada pública del módulo, expuesta a otros módulos según Spring Modulith.
+
+  Quedan exentas las interfaces que exige el propio framework (repositorios de Spring Data,
+  mappers de MapStruct).
+  *Por qué*: una interfaz con una sola implementación agrega indirección y archivos sin
+  aportar polimorfismo; los mocks de I/O no la requieren (Principio VI).
+- **SRP basado en cohesión, no en fragmentación**: una clase SHOULD NOT dividirse solo por su
+  tamaño si toda su lógica cambia por la misma razón de negocio. Se MUST preferir una clase
+  cohesiva (p. ej. 150 líneas) antes que muchas clases diminutas (p. ej. 6 de 25 líneas) que
+  obliguen a saltar entre archivos para entender un único flujo.
+  *Por qué*: SRP se refiere a razones de cambio, no a número de líneas; fragmentar en exceso
+  dispersa el flujo y reduce la legibilidad.
+- **OCP y DIP basados en evidencia**: puntos de extensión, jerarquías o inversiones de
+  dependencia no triviales MUST NOT introducirse hasta que el mismo cambio o duplicación se
+  haya presentado en al menos 2 escenarios reales, o cuando lo exija una frontera de módulo
+  (Principio I).
+  *Por qué*: una abstracción extraída de casos reales acierta en la forma; una extraída de
+  casos imaginados suele equivocarse y hay que deshacerla.
+- **Patrones de diseño (GoF) restringidos**: un patrón MUST NOT aplicarse por defecto y MAY
+  usarse solo cuando elimine complejidad accidental evidente en el problema actual.
+  *Por qué*: un patrón aplicado sin necesidad es complejidad accidental en sí mismo.
+- **Construcciones nativas antes que patrones verbosos**: se MUST preferir las construcciones
+  de Java 25 (`record`, `sealed interface`, `switch` con pattern matching, funciones de orden
+  superior) sobre patrones clásicos equivalentes. Cuando las variantes sean cerradas y
+  conocidas, se MUST usar `sealed` + pattern matching en lugar de *Visitor* o *Strategy*.
+  *Por qué*: el compilador verifica la exhaustividad del `switch` sobre tipos sellados, con
+  menos código y sin jerarquías auxiliares.
+- **Trade-offs obligatorios en `plan.md`**: toda abstracción, patrón de diseño o división de
+  clases que proponga un `plan.md` MUST documentar brevemente:
+  1. **Problema real que resuelve hoy**.
+  2. **Alternativa simple descartada** y por qué una clase o un método directo no basta.
+  3. **Costo aceptado**: indirección agregada frente al beneficio obtenido.
+
+  *Por qué*: obliga a hacer explícito el razonamiento y permite rechazar en revisión la
+  complejidad que no se justifica.
+
 ## Higiene Operacional
 
 - Credenciales, secretos, claves de firma y tokens MUST NOT versionarse; MUST inyectarse
@@ -222,7 +245,8 @@ RFC 2119. Cada regla incluye su justificación (*Por qué*).
   *Por qué*: la especificación previa hace que la implementación sea verificable contra un
   objetivo explícito.
 - El `plan.md` de cada feature MUST incluir una verificación de cumplimiento ("Constitution
-  Check") contra estos principios; toda desviación MUST justificarse o eliminarse.
+  Check") contra estos principios, incluida la evaluación de trade-offs del Principio VII;
+  toda desviación MUST justificarse o eliminarse.
   *Por qué*: detecta incumplimientos en diseño, antes de que sean costosos.
 - Una tarea se considera terminada (DoD) solo si: compila sin advertencias, todos los tests
   pasan (incluida `ApplicationModules.verify()`), se cumple el umbral de cobertura, la API
@@ -245,6 +269,6 @@ RFC 2119. Cada regla incluye su justificación (*Por qué*).
   enmienda (formato ISO `YYYY-MM-DD`).
 - **Cumplimiento**: toda revisión de código (humana o mediante el agente `spec-reviewer`) MUST
   verificar el cumplimiento de esta Constitución. Cualquier complejidad adicional MUST
-  justificarse explícitamente en el `plan.md` correspondiente.
+  justificarse explícitamente en el `plan.md` correspondiente, según el Principio VII.
 
-**Versión**: 1.0.0 | **Estado**: Activo | **Ratificada**: 2026-11-05 | **Última enmienda**: 2026-11-05
+**Versión**: 1.1.0 | **Estado**: Activo | **Ratificada**: 2026-11-05 | **Última enmienda**: 2026-11-05
