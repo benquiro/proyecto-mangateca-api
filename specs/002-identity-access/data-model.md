@@ -122,7 +122,7 @@ Los métodos que devuelven un único resultado opcional usan `Optional<T>` (Prin
 | `TokenResponse` | `access_token`, `token_type` (`"Bearer"`), `expires_in` (segundos, `900`) |
 | `UserResponse` | `id`, `email`, `displayName`, `role` |
 | `UserRegistered` (público) | `UUID userId`, `Role role`, `Instant occurredAt` |
-| `Role` (público) | `CUSTOMER`, `ADMIN` |
+| `Role` (público) | `CUSTOMER`, `ADMIN`. «Cliente»/«CLIENTE» de la spec = `CUSTOMER` |
 
 `toString()` de `RegisterRequest` y `LoginRequest` omite la contraseña.
 
@@ -143,7 +143,7 @@ Ver [contracts/configuration.md](contracts/configuration.md).
 
 ## 6. Compatibilidad con V1
 
-`event_publication` (V1) recibe una fila por listener transaccional de `UserRegistered` (R12);
-no se modifica. La FK `refresh_tokens.user_id → users.id` es el único vínculo entre tablas; las
+`event_publication` (V1) no se modifica; en esta feature `UserRegistered` no tiene consumidores
+(R12). La FK `refresh_tokens.user_id → users.id` es el único vínculo entre tablas; las
 demás features referenciarán `users.id` desde sus propios módulos solo por UUID (sin FK
 cruzada de entidades JPA, Principio I).

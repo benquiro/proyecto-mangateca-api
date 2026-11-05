@@ -4,29 +4,34 @@
 
 **Input**: Feature specification from `/specs/002-identity-access/spec.md`
 
+**Constitución de referencia**: v4.0.0
+
 ## Summary
 
 Añadir el módulo Spring Modulith `identity`: registro de clientes, login, renovación con
 rotación, logout, identidad actual (`/me`) y administrador inicial por entorno. La propia API
-emite los access tokens (JWT RS256 con `NimbusJwtEncoder`, 15 min) y la plataforma de la
-feature 001 los valida con la clave pública (`JwtDecoder`). Los refresh tokens son opacos
-(256 bits, `SecureRandom`), se guardan solo como hash SHA-256 y rotan dentro de una familia
-(`family_id`); reutilizar uno rotado revoca toda la familia.
+emite los access tokens (JWT RS256 con `NimbusJwtEncoder`, 15 min) y los valida con un
+`JwtDecoder` construido con la misma clave pública. Los refresh tokens son opacos (256 bits,
+`SecureRandom`), se guardan solo como hash SHA-256, viajan en una cookie
+`HttpOnly; Secure; SameSite` y rotan dentro de una familia (`family_id`); reutilizar uno rotado
+revoca toda la familia.
 
-Decisiones que se apartan de lo pedido o lo precisan (detalle en [research.md](research.md)):
+Decisiones clave (detalle en [research.md](research.md)):
 
-1. **El refresh token viaja en una cookie `HttpOnly; Secure; SameSite`, no en el cuerpo del
-   login** (Constitución V, que prevalece). El cuerpo trae `access_token`, `token_type` y
-   `expires_in`.
-2. **Sin umbral de cobertura ≥80%**: la Constitución VI lo prohíbe como requisito y ADR-005
-   descartó JaCoCo. Los tests pedidos sí se planifican (ver Testing).
-3. **`event_publication` solo recibe filas si hay un listener transaccional.** `identity` no tiene
-   consumidores en esta feature, así que la persistencia del evento se verifica con un listener
-   que solo existe en tests (R12).
-4. **El rechazo del rol `ADMIN` en el registro** se modela con un campo `role` con `@Null` en el
-   DTO, porque Jackson ignora por defecto las propiedades desconocidas (R11).
-5. **Prerrequisito de gobierno**: la Constitución V debe enmendarse para permitir los
-   endpoints públicos de `/api/v1/auth` antes de implementar (supuesto de la spec).
+1. **Refresh token en cookie, no en el cuerpo** (Constitución V). El cuerpo del login y del
+   refresh trae `access_token`, `token_type` y `expires_in` (R8).
+2. **Ninguna clave se versiona.** En los perfiles `dev` y `test`, sin clave configurada, se genera
+   un par RSA efímero en memoria al arrancar. En cualquier otro perfil, la falta de clave hace
+   fallar el arranque. En producción, las rutas de los PEM montados como secreto llegan por
+   variables de entorno (R4). ADR-006 reemplaza parcialmente a ADR-003 en este punto.
+3. **El par de claves vive en `identity`**, que define `JwtEncoder` y `JwtDecoder`. La cadena de
+   la plataforma consume el `JwtDecoder` por tipo, sin depender de clases de `identity` (R3).
+4. **`UserRegistered` se verifica con `@ApplicationModuleTest` + `Scenario`**
+   (`andWaitForEventOfType`); no se inspecciona `event_publication` (R12).
+5. **Rechazo de `role` en el registro** con un campo `@Null` en el DTO, porque Jackson ignora por
+   defecto las propiedades desconocidas (R11).
+6. **Roles**: el código usa `CUSTOMER` y `ADMIN`. «Cliente»/«CLIENTE» en la spec (actores,
+   US1 y el enunciado original) se mapea siempre a `Role.CUSTOMER`; no existe un rol `CLIENTE`.
 
 ## Technical Context
 
@@ -35,16 +40,17 @@ Decisiones que se apartan de lo pedido o lo precisan (detalle en [research.md](r
 **Primary Dependencies**: Spring Boot 4.1.2 (Security 7), Spring Modulith 2.1.2, MapStruct
 1.6.3, springdoc-openapi 3.2.0. **Sin dependencias nuevas**: `NimbusJwtEncoder`, Nimbus JOSE,
 `RsaKeyConverters` y `PasswordEncoderFactories` ya llegan con `oauth2-resource-server` y
-`spring-security-core`. Por eso no hay ADR de dependencia; ADR-006 documenta la decisión de
-arquitectura (emisión propia).
+`spring-security-core`. ADR-006 documenta la decisión de arquitectura (emisión propia y origen de
+las claves), no una dependencia.
 
 **Storage**: PostgreSQL 18; migración `V2__create_identity.sql` (`users`, `refresh_tokens`).
 V1 no creó extensiones, así que el correo es único con un índice sobre `lower(email)`, no con
 `citext`.
 
-**Testing**: JUnit 5 + AssertJ; `@WebMvcTest`, `@DataJpaTest` + Testcontainers
-`@ServiceConnection`, `spring-security-test`, `@ApplicationModuleTest` + `Scenario`. `Clock`
-inyectable como única frontera simulada (Constitución VI).
+**Testing**: JUnit 5 + AssertJ; `@WebMvcTest`, `@SpringBootTest` + Testcontainers
+`@ServiceConnection`, `spring-security-test`, `@ApplicationModuleTest` + `Scenario`. Mocks solo en
+repositorios, `Clock` y, en `@WebMvcTest`, la capa de aplicación de `identity` (Constitución VI).
+Detalle en la sección Testing.
 
 **Target Platform**: servidor Linux / contenedor OCI; desarrollo con Docker.
 
@@ -53,67 +59,83 @@ inyectable como única frontera simulada (Constitución VI).
 **Performance Goals**: login y registro dominados por bcrypt (coste por defecto 10, ~50–100 ms).
 Sin objetivos de throughput.
 
-**Constraints**: cero advertencias de compilación; sin secretos de producción en el repo; ninguna
-API deprecada; contraseña nunca en logs, respuestas ni `toString()`; respuestas indistinguibles
-(contenido y tiempo) entre correo inexistente y contraseña errónea.
+**Constraints**:
+
+- Cero advertencias de compilación.
+- Ninguna clave, secreto ni credencial en el repositorio.
+- Ninguna API deprecada.
+- La contraseña nunca aparece en logs, respuestas ni `toString()`.
+- Correo inexistente y contraseña errónea producen respuestas indistinguibles, en contenido y en
+  tiempo.
 
 **Scale/Scope**: 1 módulo nuevo, 1 migración, 2 tablas, 5 endpoints, 1 runner, ~25 clases de
 producción, ADR-006.
 
 ## Constitution Check
 
-*GATE: pasar antes de Phase 0. Re-evaluado tras Phase 1.*
+*GATE: pasar antes de Phase 0. Re-evaluado tras Phase 1. Constitución v4.0.0.*
 
 | # | Regla | Cómo se cumple | Estado |
 |---|-------|----------------|--------|
-| I | Módulos verticales, sin capas globales | `identity/{web,application,domain,config}` dentro del módulo | ✅ |
-| I | Límites verificados | `ModularityTests` ya existente; `identity` no importa nada de `platform` ni al revés (R14) | ✅ |
-| I | Solo API pública entre módulos | Raíz de `identity`: `UserRegistered` y `Role`. Los demás módulos usan el claim `sub` | ✅ |
-| II | Invariantes en el dominio; VO | `Email` (record con normalización/validación), `User` con bloqueo en métodos de dominio, `RefreshToken` con estados | ✅ |
-| III | Java 25, Boot 4.1.x, APIs estables | `NimbusJwtEncoder`, `RsaKeyConverters`, `PasswordEncoderFactories`: APIs estables | ✅ |
-| III | ADR por dependencia nueva | Ninguna dependencia nueva. ADR-006 igualmente (decisión de arquitectura) | ✅ |
-| III | DTO/eventos/config como `record` | Todos los DTO, `UserRegistered`, `Email` y `*Properties` son records | ✅ |
-| III | Lombok solo en entidades | No se usa Lombok (entidades con constructor protegido y accesores a mano) | ✅ |
-| IV | Flyway inmutable, `validate`, OSIV off | V2 nueva; V1 intacta; esquema validado por `@DataJpaTest` | ✅ |
-| IV | Entidades no expuestas; DTO + MapStruct | `UserMapper` (MapStruct) entidad → `UserResponse` | ✅ |
-| IV | `/api/v1`, plural | `/api/v1/auth/*`: `auth` es un espacio de acciones, no una colección. Ver Complexity Tracking | ⚠️ justificado |
-| IV | `ProblemDetail`; sin trazas | `IdentityExceptionHandler` acotado a los controladores de identity; tipos documentados | ✅ |
-| IV | `@Transactional` en aplicación; `readOnly` en consultas | Servicios de `application` | ✅ |
-| IV | JSpecify | `@NullMarked` en cada `package-info.java` nuevo | ✅ |
-| V | JWT nativo, sin libs ni filtros manuales | `NimbusJwtEncoder`/`JwtDecoder`; el login es un controlador, no un filtro | ✅ |
-| V | Access 15 min en `Authorization: Bearer` | `expires_in = 900` | ✅ |
-| V | Refresh opaco, hasheado, revocable, cookie `HttpOnly`+`Secure`+`SameSite` explícito | Cookie `refresh_token`, `Path=/api/v1/auth`, `SameSite=Strict` configurable | ✅ |
+| I | Monolito modular; módulos verticales, sin capas globales | `identity/{domain,application,web,config}` dentro del módulo; sin paquetes técnicos en raíz | ✅ |
+| I | Límites verificados con Modulith | `ModularityTests` existente cubre `identity`; `identity` no importa tipos de `platform` ni al revés | ✅ |
+| I | Solo API pública o eventos entre módulos | Raíz de `identity`: `UserRegistered` y `Role`. Otros módulos usan el claim `sub`; `platform` consume `JwtDecoder` (interfaz de Spring) por tipo | ✅ |
+| I | Terceros como puerto de dominio | N/A: sin integraciones externas | — |
+| II | Invariantes en el dominio | `User` (bloqueo, contador, nombre), `RefreshToken` (rotado/revocado/expirado), `Email` con validación en el constructor compacto | ✅ |
+| II | Dinero en `BigDecimal`/`Money` | N/A | — |
+| II | Identificadores de negocio como VO `record` | `Email` | ✅ |
+| III | Java 25, Boot 4.1.x, solo APIs estables | `NimbusJwtEncoder`/`NimbusJwtDecoder`, `RsaKeyConverters`, `PasswordEncoderFactories`, `Environment.matchesProfiles` | ✅ |
+| III | No eliminar dependencias base; ADR por dependencia nueva | Ninguna dependencia nueva ni eliminada; ADR-006 por decisión de arquitectura | ✅ |
+| III | DTO, comandos, eventos y VO como `record` | DTO, `UserRegistered`, `Email`, `IdentityProperties` | ✅ |
+| III | Lombok solo en entidades; sin `@Data` | No se usa Lombok | ✅ |
+| IV | PostgreSQL único; Flyway versionado e inmutable | V2 nueva; V1 intacta | ✅ |
+| IV | `ddl-auto=validate`, OSIV off | Sin cambios; el smoke test de arranque valida V2 contra las entidades | ✅ |
+| IV | Sin N+1 | `RefreshToken` referencia al usuario por `userId` (sin `@ManyToOne`); consultas por clave | ✅ |
+| IV | `@Transactional` en aplicación, `readOnly` en consultas | `AuthenticationService`, `RefreshTokenService`; `me()` con `readOnly = true` | ✅ |
+| IV | Entidades no expuestas; DTO + MapStruct | `UserMapper` (MapStruct) `User` → `UserResponse` | ✅ |
+| IV | `/api/v1`, plural; excepción `/api/v1/auth/` con verbos | `register`, `login`, `refresh`, `logout`, `me` bajo `/api/v1/auth/`, dentro de la excepción acotada | ✅ |
+| IV | `ProblemDetail` vía `@RestControllerAdvice`, sin trazas | `IdentityExceptionHandler` (3 tipos documentados) + `GlobalExceptionHandler` de 001 | ✅ |
+| IV | Listados paginados | N/A: no hay listados | — |
+| IV | JSpecify; `Optional` en resultados únicos | `@NullMarked` en cada `package-info.java`; repositorios con `Optional<T>` | ✅ |
+| V | JWT nativo; sin librerías ni filtros manuales | `NimbusJwtEncoder`/`JwtDecoder`; el login es un controlador, no un filtro | ✅ |
+| V | Access ~15 min en `Authorization: Bearer` | `expires_in = 900` | ✅ |
+| V | Refresh opaco, hasheado, revocable; cookie `HttpOnly` + `Secure` + `SameSite` explícito | SHA-256 en `BYTEA`; familia revocable; cookie `refresh_token`, `Path=/api/v1/auth`, `SameSite=Strict` por defecto | ✅ |
 | V | `PasswordEncoder` delegante | `PasswordEncoderFactories.createDelegatingPasswordEncoder()` | ✅ |
-| V | Deny-by-default; `@PreAuthorize` | Cadena de plataforma intacta; `identity` añade una cadena acotada a 4 rutas | ✅ |
-| V | Acceso anónimo limitado a catálogo y reseñas | Registro/login/refresh/logout son públicos | ❌ **requiere enmienda previa** |
-| V | Identidad desde el token | `/me` usa `sub`; ningún parámetro del cliente | ✅ |
-| VI | Tests obligatorios | Seguridad crítica, flujo feliz de auth y `ApplicationModules.verify()`: ver Testing | ✅ |
-| VI | Testcontainers PostgreSQL; sin H2; mocks solo en I/O | `@ServiceConnection`; solo `Clock` se fija | ✅ |
-| VI | Sin umbral de cobertura; cero advertencias | No se añade JaCoCo | ✅ (ver resumen, punto 2) |
-| VII | Clases concretas; trade-offs | Sin interfaces propias; ver tabla de trade-offs | ✅ |
-| Hig. | Secretos por entorno; PII/contraseñas/tokens fuera de logs | R3, R4, R13, R14 | ✅ |
+| V | Deny-by-default + `@PreAuthorize` | La cadena de plataforma no cambia; `identity` añade una cadena acotada a las 4 rutas públicas | ✅ |
+| V | Roles `CUSTOMER`/`ADMIN` | `Role` enum; «CLIENTE» de la spec → `CUSTOMER` | ✅ |
+| V | Acceso anónimo: catálogo, reseñas y los 4 `POST /api/v1/auth/*` | Exactamente `register`, `login`, `refresh`, `logout`; `/me` requiere token | ✅ |
+| V | Anti IDOR; identidad del token | `/me` lee `sub`; ningún identificador llega del cliente | ✅ |
+| VI | Solo tests vitales | Obligatorios + escenarios de la spec (sección Testing) | ✅ |
+| VI | Tests obligatorios 1–4 | Arquitectura y smoke, invariantes de `User`, seguridad crítica y flujo feliz de los 5 endpoints | ✅ |
+| VI | Testcontainers vía `@ServiceConnection`; sin H2 | `TestcontainersConfiguration` de 001 | ✅ |
+| VI | Mocks: repositorios, `Clock` y capa de aplicación en `@WebMvcTest`; no entidades, records ni VO | Exactamente esos; `PasswordEncoder` y `JwtEncoder` reales; publicador de eventos sustituido por una lambda que captura | ✅ |
+| VI | Cero advertencias (`-Xlint:all,-processing`) | Toolchain de 001 sin cambios | ✅ |
+| VII | Clases concretas; sin interfaces especulativas | Ninguna interfaz propia salvo las de framework (Spring Data, MapStruct) | ✅ |
+| VII | SRP por cohesión; trade-offs documentados | Tabla de trade-offs | ✅ |
+| Hig. | Secretos y claves no versionados; por entorno | Par efímero en dev/test; rutas de PEM por variables en producción; arranque falla sin clave fuera de dev/test | ✅ |
+| Hig. | DTO validados con `@Valid` | `RegisterRequest`, `LoginRequest` | ✅ |
+| Hig. | CORS explícito; Actuator `health`/`info` | Sin cambios respecto a 001 | ✅ |
+| Hig. | Sin contraseñas, tokens ni PII en logs | Solo `userId`/`familyId`; `toString()` enmascarado en DTO y propiedades (R13, R14) | ✅ |
+| DoD | `spec.md`, `plan.md` y `tasks.md` aprobados; OpenAPI | `tasks.md` pendiente (`/speckit-tasks`); OpenAPI de springdoc contrastado con `contracts/openapi.yaml` | ⏳ |
 
-**Resultado pre-Phase 0**: la única violación es la fila ❌ (acceso anónimo). La spec ya la
-declara como prerrequisito. **No bloquea el plan, pero sí `/speckit-implement`**: debe
-mergearse antes la enmienda de la Constitución (Governance: PR dedicado; relajar una regla
-`MUST` es cambio MAJOR) con el texto equivalente a «...salvo los endpoints de registro, login,
-renovación y cierre de sesión». Se crea como tarea T001 en `/speckit-tasks`.
+**Resultado pre-Phase 0**: PASS, sin violaciones.
 
-**Resultado post-Phase 1**: sin cambios; el diseño no añade violaciones.
+**Resultado post-Phase 1** (re-evaluado tras data-model y contracts): PASS. El diseño no añade
+interfaces propias, dependencias ni rutas anónimas fuera de las cuatro permitidas.
 
 ## Evaluación de trade-offs (Principio VII)
 
 | Elemento | Problema real que resuelve hoy | Alternativa simple descartada | Costo aceptado |
 |----------|--------------------------------|-------------------------------|----------------|
-| `Email` (record VO) | Normalizar (trim + minúsculas) en un solo sitio; se usa en registro, login y admin inicial | `String.toLowerCase()` repetido en cada servicio: tres copias que pueden divergir | 1 record de ~15 líneas |
-| `@ValidPassword` + `PasswordPolicy` | 8–64 caracteres **y** ≤72 bytes UTF-8, igual en el DTO y en el admin inicial | `@Size(8,64)` solo: 64 caracteres multibyte superan los 72 bytes de bcrypt | 1 anotación + 1 validador + 1 clase estática |
-| `AuthenticationService` y `RefreshTokenService` separados | Cambian por razones distintas: credenciales/bloqueo vs. ciclo de vida y rotación de tokens; los tests pedidos los separan | Una sola clase de ~250 líneas con ambas | 1 dependencia entre dos clases concretas |
-| Cadena `SecurityFilterChain` propia de `identity` (`@Order(1)`, 4 rutas) | Permitir rutas públicas sin que `platform` conozca `/api/v1/auth` (límite de módulos) | Añadir los `permitAll` en `platform.SecurityConfiguration`: acopla `platform` a `identity` | 1 `@Configuration`; segunda cadena que mantener |
-| `IdentityExceptionHandler` (`basePackageClasses`) | Tipos de problema propios (`email-already-in-use`, `invalid-credentials`, `invalid-refresh-token`) sin que `platform` los conozca | Meter los 3 tipos en `GlobalExceptionHandler`: acopla `platform` a excepciones de `identity` | 1 `@RestControllerAdvice` de ~40 líneas |
-| `RefreshCookieFactory` | Construir y borrar la cookie con los mismos atributos en login, refresh y logout | Armar `ResponseCookie` en el controlador, 3 veces | 1 clase de ~30 líneas |
-| `@Null String role` en `RegisterRequest` | Rechazar `role` con error de campo (spec: 400 de validación) | `fail-on-unknown-properties=true` global: cambia el comportamiento de todo el API | Un campo que en el contrato debe ir ausente |
-| Dos pares de claves de desarrollo (dev, test) versionados | Firmar en dev/test sin variables; `./mvnw spring-boot:run` sigue sin configuración | Par efímero por arranque (001): el `JwtEncoder` de identity y el `JwtDecoder` de plataforma necesitan **el mismo** par, y el test de contexto lo recrea cada vez | 4 archivos PEM marcados «solo desarrollo» + un test que prohíbe usarlos fuera de dev/test |
-| `dummy hash` precalculado | Igualar el tiempo de login con correo inexistente (SC-002) | No igualar: el tiempo de respuesta revelaría qué correos existen | 1 campo y 1 comparación bcrypt extra |
+| `Email` (record VO) | Normalizar (recorte + minúsculas) en un solo sitio; lo usan registro, login y admin inicial | `toLowerCase()` repetido en cada servicio: tres copias que pueden divergir | 1 record de ~15 líneas |
+| `@ValidPassword` + `PasswordPolicy` | 8–64 caracteres **y** ≤72 bytes UTF-8, igual en el DTO y en el admin inicial | Solo `@Size(8,64)`: 64 caracteres multibyte superan los 72 bytes de bcrypt | 1 anotación, 1 validador y 1 clase estática |
+| `AuthenticationService` y `RefreshTokenService` separados | Cambian por razones distintas: credenciales y bloqueo vs. ciclo de vida y rotación de tokens | Una clase de ~250 líneas con ambas responsabilidades | 1 dependencia entre dos clases concretas |
+| `JwtKeyConfiguration` en `identity` (par único → `JwtEncoder` y `JwtDecoder`) | Con un par efímero, encoder y decoder deben compartir la misma instancia en memoria | Decoder en `platform` y encoder en `identity`: cada uno generaría su propio par y ningún token validaría, o `platform` tendría que depender de `identity` | `platform` deja de definir el decoder y depende de que exista un bean `JwtDecoder` |
+| Cadena `SecurityFilterChain` propia de `identity` (`@Order(1)`, 4 rutas) | Rutas públicas sin que `platform` conozca `/api/v1/auth` | `permitAll` en `platform.SecurityConfiguration`: acopla `platform` a `identity` | 1 `@Configuration`; una segunda cadena que mantener |
+| `IdentityExceptionHandler` (`basePackageClasses`) | Tipos de problema propios sin que `platform` conozca excepciones de `identity` | Añadir los 3 tipos al `GlobalExceptionHandler`: acopla los módulos | 1 `@RestControllerAdvice` de ~40 líneas |
+| `RefreshCookieFactory` | Mismos atributos de cookie al emitirla (login, refresh) y al borrarla (logout) | Construir `ResponseCookie` tres veces en el controlador | 1 clase de ~30 líneas |
+| `@Null String role` en `RegisterRequest` | Rechazar `role` con error de campo (spec: 400 de validación) | `fail-on-unknown-properties=true` global: cambia el contrato de toda la API | Un campo que el contrato exige ausente |
+| Hash ficticio precalculado | Igualar el tiempo del login con correo inexistente (SC-002) | No igualarlo: el tiempo revelaría qué correos existen | 1 campo y 1 comparación bcrypt extra |
 
 ## Project Structure
 
@@ -135,9 +157,9 @@ specs/002-identity-access/
 ### Source Code (repository root)
 
 ```text
-docs/adr/ADR-006-token-issuance.md             # emisión propia vs. Spring Authorization Server
-dev/keys/                                      # SOLO DESARROLLO: README.md, jwt-dev-private.pem, jwt-dev-public.pem
-pom.xml                                        # sin dependencias nuevas
+docs/adr/ADR-006-token-issuance.md             # emisión propia; reemplaza parcialmente a ADR-003 (origen de claves)
+docs/adr/ADR-003-oauth2-resource-server.md     # MODIFICADO: nota «parcialmente reemplazado por ADR-006»
+pom.xml                                        # Surefire: spring.profiles.active=test (sin dependencias nuevas)
 
 src/main/java/com/mangateca/api/identity/      # módulo Modulith "identity"
 ├── package-info.java                          # @ApplicationModule + @NullMarked
@@ -146,135 +168,161 @@ src/main/java/com/mangateca/api/identity/      # módulo Modulith "identity"
 ├── domain/
 │   ├── package-info.java
 │   ├── User.java                              # entidad JPA; bloqueo y contador en métodos de dominio
-│   ├── RefreshToken.java                      # entidad JPA; rotated/revoked/expired
+│   ├── RefreshToken.java                      # entidad JPA; rotado/revocado/expirado
 │   ├── Email.java                             # VO record
 │   ├── UserRepository.java                    # Spring Data
 │   └── RefreshTokenRepository.java
 ├── application/
 │   ├── package-info.java
 │   ├── AuthenticationService.java             # register, login, me
-│   ├── RefreshTokenService.java               # issue, rotate (reuse detection), revoke
+│   ├── RefreshTokenService.java               # issue, rotate (detección de reutilización), revoke
 │   ├── AccessTokenIssuer.java                 # JwtEncoder → access token (sub, roles, iat, exp, iss)
-│   ├── PasswordPolicy.java                    # 8–64 chars, ≤72 bytes UTF-8
+│   ├── PasswordPolicy.java                    # 8–64 caracteres, ≤72 bytes UTF-8
 │   ├── BootstrapAdminRunner.java              # ApplicationRunner idempotente
-│   └── (excepciones) EmailAlreadyInUseException, InvalidCredentialsException, InvalidRefreshTokenException
+│   └── EmailAlreadyInUseException, InvalidCredentialsException, InvalidRefreshTokenException
 ├── web/
 │   ├── package-info.java
 │   ├── AuthController.java                    # 5 endpoints
-│   ├── RegisterRequest.java, LoginRequest.java, TokenResponse.java, UserResponse.java   # records
+│   ├── RegisterRequest, LoginRequest, TokenResponse, UserResponse   # records
 │   ├── ValidPassword.java, ValidPasswordValidator.java
 │   ├── UserMapper.java                        # MapStruct
 │   ├── RefreshCookieFactory.java
 │   └── IdentityExceptionHandler.java          # @RestControllerAdvice acotado
 └── config/
     ├── package-info.java
-    ├── IdentitySecurityConfiguration.java     # cadena pública @Order(1), PasswordEncoder, JwtEncoder, Clock
-    ├── IdentityProperties.java                # record: private-key, access/refresh TTL, cookie, bootstrap-admin
-    └── RsaKeys.java                           # carga PEM con RsaKeyConverters
+    ├── IdentitySecurityConfiguration.java     # cadena pública @Order(1), PasswordEncoder, Clock
+    ├── JwtKeyConfiguration.java               # par RSA (PEM o efímero dev/test) → JwtEncoder + JwtDecoder
+    └── IdentityProperties.java                # record: jwt, TTL, cookie, bootstrap-admin
 
 src/main/java/com/mangateca/api/platform/security/
-├── JwtVerificationProperties.java             # NUEVO: record (public-key, issuer)
-├── JwtDecoderConfiguration.java               # NUEVO: JwtDecoder explícito con validador de issuer
-└── DevJwtDecoderConfiguration.java            # ELIMINADO (sustituido)
+└── DevJwtDecoderConfiguration.java            # ELIMINADO (lo sustituye JwtKeyConfiguration)
 
 src/main/resources/
-├── application.yaml                           # + claves mangateca.security.jwt / mangateca.identity.*
-├── application-dev.yaml                       # + rutas a dev/keys
+├── application.yaml                           # + mangateca.identity.* (sin claves ni valores por defecto de issuer)
+├── application-dev.yaml                       # + issuer de desarrollo
 └── db/migration/V2__create_identity.sql
 
 src/test/resources/
-├── application.yaml                           # propiedades de test (claves test, TTL)
-└── keys/{jwt-test-private.pem, jwt-test-public.pem}   # SOLO TEST
+└── application-test.yaml                      # issuer de test (sin claves: par efímero)
 
 src/test/java/com/mangateca/api/
-├── TestSecurityConfiguration.java             # MODIFICADO: ya no define JwtEncoder/JwtDecoder
-├── ModularityTests.java                       # sin cambios (cubre identity)
+├── TestSecurityConfiguration.java             # MODIFICADO: sin beans JwtEncoder/JwtDecoder; helper de tokens de prueba
+├── ModularityTests.java                       # existente (cubre identity)
+├── ApiApplicationTests.java                   # existente (smoke; valida V2 con ddl-auto=validate)
 └── identity/
-    ├── domain/
-    │   ├── UserLockoutTests.java              # unitario: 5 fallos, 15 min, reinicio, expiración
-    │   ├── EmailTests.java
-    │   └── RefreshTokenRepositoryIT.java, UserRepositoryIT.java, IdentitySchemaIT.java   # @DataJpaTest + V2
+    ├── domain/UserLockoutTests.java           # unitario sin Spring ni BD
     ├── application/
-    │   ├── AuthenticationServiceTests.java    # unitario con Clock fijo y repos en memoria de test
-    │   ├── RefreshTokenServiceTests.java      # rotación, reutilización, expiración
-    │   ├── PasswordPolicyTests.java
-    │   └── BootstrapAdminRunnerIT.java        # idempotencia, config ausente/incompleta, sin log de contraseña
-    ├── web/
-    │   ├── AuthControllerTests.java           # @WebMvcTest: contratos, cookie, errores
-    │   └── AuthSecurityTests.java             # spring-security-test: públicas vs. protegidas, 401/403
-    └── UserRegisteredIT.java                  # @ApplicationModuleTest + Scenario + listener de test
+    │   ├── AuthenticationServiceTests.java    # unitario: repos mock + Clock fijo
+    │   └── RefreshTokenServiceTests.java      # unitario: repos mock + Clock fijo
+    ├── web/AuthControllerTests.java           # @WebMvcTest: capa de aplicación mockeada
+    ├── AuthFlowIT.java                        # @SpringBootTest + Testcontainers: flujo feliz + seguridad crítica
+    ├── BootstrapAdminIT.java                  # @SpringBootTest + Testcontainers: US5
+    └── UserRegisteredIT.java                  # @ApplicationModuleTest + Scenario
 ```
 
 **Structure Decision**: un único proyecto Maven. `identity` es un módulo vertical; solo su
-paquete raíz es API pública (`UserRegistered`, `Role`), y `domain/application/web/config` son
-internos. `platform` y `identity` no se importan entre sí: se acuerdan por contrato de datos
-(claim `roles`, claim `sub`, propiedad `mangateca.security.jwt.issuer`).
-
-Los tests con base de datos usan el sufijo `IT`; los unitarios y de slice, `Tests`, según la
-convención de la feature 001 (Surefire ejecuta ambos en `./mvnw verify`).
+paquete raíz es API pública (`UserRegistered`, `Role`), y `domain`, `application`, `web` y `config`
+son internos. `platform` e `identity` no se importan entre sí: se acuerdan por contrato (claims
+`sub` y `roles`, bean `JwtDecoder` de Spring). Los tests de integración llevan el sufijo `IT` y los
+unitarios y de slice el sufijo `Tests`, según la convención de 001.
 
 ## Testing
 
-La Constitución VI limita los tests obligatorios; esta feature planifica además los tests que
-pidió el usuario, que cuentan como petición explícita para los opcionales.
+Alcance según la Constitución VI: solo los tests obligatorios y los escenarios de aceptación que
+`spec.md` enumera. Los casos borde de la spec (registro concurrente, correo con espacios,
+token malformado, varias instancias del admin inicial…) quedan resueltos por diseño (research R6,
+R7, R11, R13) y no tienen tests propios.
 
-| Petición | Clase(s) | Cubre |
-|----------|----------|-------|
-| Unitarios: autenticación, bloqueo, rotación | `AuthenticationServiceTests`, `UserLockoutTests`, `RefreshTokenServiceTests` | FR-006…FR-014, SC-004, SC-005 |
-| `@WebMvcTest` de controladores | `AuthControllerTests` | Contrato HTTP, cookie, ProblemDetail, rechazo de `role` |
-| `@DataJpaTest` + Testcontainers: repos y V2 | `UserRepositoryIT`, `RefreshTokenRepositoryIT`, `IdentitySchemaIT` | Unicidad `lower(email)`, índices, `ddl-auto=validate` |
-| Seguridad con `spring-security-test` | `AuthSecurityTests` | FR-019, FR-021: rutas públicas, `/me` 401, `CUSTOMER` → 403 en recurso `ADMIN` |
-| `@ApplicationModuleTest` + `Scenario` | `UserRegisteredIT` | `UserRegistered` publicado dentro de la transacción y fila en `event_publication` |
-| Obligatorios (VI) | `ModularityTests` (existente), `ApiApplicationTests` (existente), `AuthFlowIT` (flujo feliz de punta a punta con `@SpringBootTest`) | Arquitectura, arranque, flujo feliz de auth |
+### Tests obligatorios
 
-Notas:
+| VI | Clase | Qué verifica |
+|----|-------|--------------|
+| 1. Arquitectura | `ModularityTests` (existente) | `ApplicationModules.verify()` con el módulo `identity` |
+| 1. Smoke | `ApiApplicationTests` (existente) | El contexto arranca con el perfil `test`, par efímero y V2 validada (`ddl-auto=validate`) |
+| 2. Invariantes de dominio | `UserLockoutTests` | 5 fallos → bloqueo 15 min; bloqueo vigente rechaza; vencido permite; login correcto reinicia el contador |
+| 3. Seguridad crítica | `AuthFlowIT` | Las 4 rutas públicas responden sin token; `/me` sin token o con token expirado → 401; token `CUSTOMER` → 403 en `/api/v1/probes/admin` (controlador de test de 001); `/me` devuelve solo al usuario del `sub` (dos usuarios) |
+| 4. Flujo feliz | `AuthFlowIT` | register → login → me → refresh → logout, con cookies y tokens reales |
 
-- `@DataJpaTest` con `@AutoConfigureTestDatabase(replace = NONE)` y `TestcontainersConfiguration`.
-- La rotación concurrente (dos refresh simultáneos con el mismo token) se prueba en
-  `RefreshTokenServiceTests` a nivel de lógica y se valida a mano en el quickstart.
-- Los tests existentes de 001 que firmaban tokens con `TestSecurityConfiguration` pasan a usar
-  el `JwtEncoder` real y las claves de test (ver «Impacto en la feature 001»).
+### Escenarios de aceptación de la spec
+
+| Escenario | Clase | Notas |
+|-----------|-------|-------|
+| US1 Registro exitoso (CUSTOMER, sin contraseña en la respuesta) | `AuthFlowIT` | Parte del flujo feliz |
+| US1 … y se publica «usuario registrado» | `UserRegisteredIT` | `scenario.stimulate(() -> service.register(...)).andWaitForEventOfType(UserRegistered.class).matching(...).toArriveAndVerify(...)` |
+| US1 Correo existente con otra capitalización | `AuthFlowIT` | Ejercita el índice único real |
+| US1 Datos inválidos (5 ejemplos) | `AuthControllerTests` | Parametrizado; 400 con `errors[field]` |
+| US1 Intento de elegir `ADMIN` | `AuthControllerTests` | 400 `errors[role]`; el servicio mockeado nunca se invoca |
+| US2 Login exitoso (15 min / 7 días) | `AuthFlowIT` | `exp − iat = 900`, `expires_in = 900`, cookie `Max-Age=604800` |
+| US2 Credenciales inválidas indistinguibles | `AuthFlowIT` | Compara estado, `type` y `detail` (correo inexistente vs. contraseña errónea) |
+| US2 Bloqueo tras cinco fallos | `AuthenticationServiceTests` | `Clock` fijo: rechazo con la contraseña correcta hasta que vence el bloqueo; misma excepción |
+| US2 Login exitoso reinicia el contador | `AuthenticationServiceTests` | Con 4 fallos previos |
+| US2 Cuenta deshabilitada | `AuthenticationServiceTests` | Misma excepción que credenciales inválidas |
+| US3 Renovación válida | `RefreshTokenServiceTests` | Token nuevo; el anterior queda rotado e inservible |
+| US3 Reutilización de un token rotado | `RefreshTokenServiceTests` | Rechazo + revocación de la familia |
+| US3 Cierre de sesión | `RefreshTokenServiceTests` | Tras el logout, el token ya no renueva |
+| US3 Cierre de sesión idempotente | `AuthControllerTests` (cookie ausente) y `RefreshTokenServiceTests` (desconocido, expirado) | Siempre 204 |
+| US4 Consulta con token válido | `AuthFlowIT` | Sin datos sensibles |
+| US4 Token expirado / sin token → 401 | `AuthFlowIT` | ProblemDetail de 001 |
+| US4 CUSTOMER accede a recurso ADMIN → 403 | `AuthFlowIT` | Token real emitido por `identity` |
+| US5 Arranque con configuración | `BootstrapAdminIT` | Crea un administrador |
+| US5 Reinicio | `BootstrapAdminIT` | Segunda ejecución del runner: sigue habiendo uno |
+| US5 Arranque sin configuración | `BootstrapAdminIT` | Ningún administrador |
+
+### Mocks y dobles permitidos
+
+| Test | Mock | Real |
+|------|------|------|
+| `UserLockoutTests` | — | `User`, `Instant` |
+| `AuthenticationServiceTests`, `RefreshTokenServiceTests` | `UserRepository`, `RefreshTokenRepository`, `Clock.fixed` | `PasswordEncoder`, `AccessTokenIssuer` con un `JwtEncoder` sobre un par efímero, entidades. El `ApplicationEventPublisher` se sustituye por una lambda que captura eventos (no se mockea; la publicación se verifica en `UserRegisteredIT`) |
+| `AuthControllerTests` | `AuthenticationService`, `RefreshTokenService` (`@MockitoBean`) | Validación, `UserMapper`, `RefreshCookieFactory`, `IdentityExceptionHandler`, cadena pública importada |
+| `*IT` | — | Todo, con Testcontainers |
+
+### Configuración de tests
+
+- Perfil `test` activado para todo `./mvnw verify` con `spring.profiles.active=test` en
+  `systemPropertyVariables` de Surefire. Con él, `JwtKeyConfiguration` genera el par efímero. En
+  el IDE hay que activar el mismo perfil.
+- Los tests de 001 que firmaban tokens con `TestSecurityConfiguration` pasan a usar el
+  `JwtEncoder` de `identity`. El caso «firmado con otra clave» de `SecurityIT` sigue generando su
+  propio par local.
 
 ## Impacto en la feature 001
 
 | Elemento | Cambio |
 |----------|--------|
-| `DevJwtDecoderConfiguration` | Se elimina; la sustituye `JwtDecoderConfiguration` (todos los perfiles) |
-| Propiedad `spring.security.oauth2.resourceserver.jwt.public-key-location` (contrato de configuración 001) | Se reemplaza por `mangateca.security.jwt.public-key-location` y `.issuer`, ambas obligatorias. Motivo: validar `iss` de forma explícita, no dependiendo de cómo Boot combine `public-key-location` con `issuer-uri` |
-| `TestSecurityConfiguration` | Deja de definir `JwtDecoder`/`JwtEncoder`; ofrece un helper para acuñar tokens de prueba con el `JwtEncoder` real. El caso «firmado con otra clave» sigue usando un par efímero local |
-| ADR-003 | Se anota que la alternativa «clave pública de dev versionada» queda superada por ADR-006 (ahora hay clave privada de uso real en dev/test) |
-| `SecurityConfiguration.jwtAuthenticationConverter` | Sin cambios: ya mapea `roles` → `ROLE_*` |
+| `DevJwtDecoderConfiguration` | Se elimina; lo sustituye `JwtKeyConfiguration` de `identity` |
+| Contrato de configuración 001 (`spring.security.oauth2.resourceserver.jwt.public-key-location`) | Se sustituye por `mangateca.identity.jwt.*` ([contracts/configuration.md](contracts/configuration.md)) |
+| `TestSecurityConfiguration` | Sin beans `JwtEncoder`/`JwtDecoder` (chocarían con los de `identity`); queda un helper para acuñar tokens de prueba |
+| `SecurityConfiguration` (`jwtAuthenticationConverter`, cadena) | Sin cambios: ya mapea `roles` → `ROLE_*` y toma el `JwtDecoder` del contexto |
+| ADR-003 | Nota de reemplazo parcial por ADR-006 (origen de claves y propietario del decoder) |
 
 ## Orden de implementación (guía para `/speckit-tasks`)
 
-1. **Gobierno**: enmienda de la Constitución V (prerrequisito) y ADR-006.
-2. **Claves y configuración de plataforma**: `dev/keys`, claves de test, `JwtVerificationProperties`,
-   `JwtDecoderConfiguration`; retirar `DevJwtDecoderConfiguration`; adaptar tests 001. Verificar
-   que 001 sigue en verde antes de continuar.
-3. **Persistencia**: `V2__create_identity.sql`, entidades, repositorios, `IdentitySchemaIT`.
-4. **Dominio y servicios**: `Email`, `User` (bloqueo), `RefreshToken`, `PasswordPolicy`,
-   `AccessTokenIssuer`, `RefreshTokenService`, `AuthenticationService` con sus tests unitarios.
-5. **Web**: DTO, mapper, cookie, controlador, handler, cadena de seguridad pública.
+1. **ADR-006** y nota en ADR-003.
+2. **Claves y decoder**: `IdentityProperties`, `JwtKeyConfiguration`, perfil `test` en Surefire;
+   retirar `DevJwtDecoderConfiguration`; adaptar `TestSecurityConfiguration` y los tests de 001.
+   Verificar que 001 sigue en verde antes de continuar.
+3. **Persistencia**: `V2__create_identity.sql`, entidades y repositorios (lo valida el smoke test).
+4. **Dominio y servicios**: `Email`, `User`, `RefreshToken`, `PasswordPolicy`, `AccessTokenIssuer`,
+   `RefreshTokenService`, `AuthenticationService` y sus tests unitarios.
+5. **Web**: DTO, mapper, cookie, controlador, handler, cadena pública y `AuthControllerTests`.
 6. **Evento**: `UserRegistered` y `UserRegisteredIT`.
-7. **Administrador inicial**: runner y su test.
-8. **Cierre**: OpenAPI verificado contra `contracts/openapi.yaml`, README, quickstart ejecutado.
+7. **Administrador inicial**: runner y `BootstrapAdminIT`.
+8. **Cierre**: `AuthFlowIT`, OpenAPI contrastado con `contracts/openapi.yaml`, README y quickstart.
 
 ## Riesgos
 
 | Riesgo | Mitigación |
 |--------|------------|
-| Clave de desarrollo usada en producción | Sin valores por defecto en `application.yaml`; solo `application-dev.yaml` y los `src/test/resources` las referencian; test que falla el arranque sin perfil dev si faltan las propiedades; `dev/keys/README.md` y cabecera en cada PEM |
-| Cookie `Secure` no se guarda en Safari sobre `http://localhost` | Chrome/Firefox tratan `localhost` como contexto seguro; en Safari usar HTTPS local. No se relaja `Secure` (Constitución V) |
-| `SameSite=Strict` falla si el frontend y la API quedan en sitios distintos en producción | `SameSite` configurable (`Strict`/`Lax`/`None`) con valor explícito siempre; decidir al desplegar |
-| Dos pestañas refrescan a la vez con el mismo token: la segunda cuenta como reutilización y cierra la sesión | Comportamiento aceptado y documentado (sin ventana de gracia: YAGNI). Se revisa si el frontend lo sufre |
-| Crecimiento de `refresh_tokens` (sin purga) | Fuera de alcance; índice por `family_id` y `user_id`; tarea de purga futura anotada en research R7 |
-| `Role`/`enabled` cambian pero el access token vigente conserva los antiguos (≤15 min) | Documentado como límite aceptado; el refresh relee el usuario |
-| Registro de eventos sin filas por falta de listener | R12: listener solo de test; el primer consumidor real (feature futura) hereda la persistencia |
-| Bcrypt y contraseñas >72 bytes | `PasswordPolicy` rechaza antes de codificar; test con 64 caracteres de 4 bytes |
+| Arrancar en producción sin perfil y con el par efímero | El par efímero solo se genera si el perfil activo es `dev` o `test`; en cualquier otro caso, la falta de clave aborta el arranque con un mensaje explícito (R4). Validado a mano en el quickstart |
+| Tokens de dev inválidos tras reiniciar (par efímero) | Aceptado, igual que en 001: basta con volver a iniciar sesión |
+| Cookie `Secure` no guardada en Safari sobre `http://localhost` | Chrome y Firefox tratan `localhost` como contexto seguro; en Safari, HTTPS local. `Secure` no se relaja (Constitución V) |
+| Refresh simultáneo en varias pestañas cierra la sesión | Refresh single-flight en el frontend (Web Locks API), feature 012 (R18) |
+| Frontend y API en dominios distintos en producción | `SameSite=None` y protección CSRF en `/refresh` (R19) |
+| Crecimiento de `refresh_tokens` (sin purga) | Fuera de alcance; índices por `family_id` y `user_id`; purga futura anotada en R7 |
+| `role`/`enabled` cambian pero el access token vigente conserva los valores antiguos (≤15 min) | Límite aceptado; el refresh relee al usuario |
+| Contraseñas de más de 72 bytes en bcrypt | `PasswordPolicy` rechaza antes de codificar; comprobación manual en el quickstart (no es un escenario de la spec, VI) |
 
 ## Complexity Tracking
 
-| Desviación | Por qué | Alternativa descartada |
-|------------|---------|------------------------|
-| Ruta `/api/v1/auth/*` con verbos (`login`, `logout`, `refresh`) y no sustantivos en plural (Constitución IV) | Son comandos de un flujo de autenticación, no CRUD de un recurso; el usuario fijó estas rutas | `/api/v1/sessions` (REST puro): diverge del contrato pedido y del esquema común de frontends. Se propone anotar en la enmienda de la Constitución (junto a la excepción de acceso anónimo) que `/api/v1/auth` queda exento |
-| Dos pares de claves RSA privadas versionados (dev y test) | Ver trade-offs. Contradice la alternativa descartada en ADR-003, que se enmienda | Generar el par en cada arranque: imposible de compartir entre el encoder y el decoder tras reiniciar y rompe `spring-boot-devtools` |
+Sin desviaciones: el Constitution Check (v4.0.0) pasa sin excepciones que justificar.
