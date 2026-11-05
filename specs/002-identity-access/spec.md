@@ -297,7 +297,7 @@ Scenario: Arranque sin configuración
 - El bloqueo temporal es por cuenta (no por IP); la limitación de tasa por IP está fuera de alcance.
 - El cierre de sesión invalida únicamente el token de renovación; el token de acceso ya emitido expira por sí solo (máx. 15 minutos).
 - Por la Constitución (V), el token de renovación es opaco y viaja en una cookie inaccesible para scripts del cliente, y el token de acceso viaja en el encabezado `Authorization: Bearer`. Los detalles de transporte se definen en el plan.
-- La Constitución (V) limita hoy el acceso anónimo a lectura de catálogo y reseñas; los endpoints públicos de registro, inicio de sesión y renovación (FR-019, incluido el cierre de sesión) requieren una excepción explícita, a formalizar vía enmienda de la Constitución antes de implementar.
+- El acceso anónimo a los endpoints de registro, inicio de sesión, renovación y cierre de sesión (FR-019) está permitido por la Constitución v4.0.0 (Principio V), que los enumera explícitamente junto con la lectura de catálogo y reseñas.
 - Un administrador deshabilitado o bloqueado sigue las mismas reglas que un cliente (FR-010, FR-011).
 - Las credenciales del administrador inicial se inyectan por variables de entorno (Higiene Operacional de la Constitución).
 - Fuera de alcance: edición de perfil y direcciones (feature 009), gestión de usuarios por el administrador (feature 010), recuperación de contraseña, verificación de correo, inicio de sesión social, autenticación multifactor y limitación de tasa por IP.
