@@ -44,5 +44,7 @@ arranca.
 | `management.endpoints.web.exposure.include`              | `health,info` |
 | `management.endpoint.health.show-details`                | `never` |
 | `management.endpoint.health.show-components`             | `always` |
-| `server.error.include-stacktrace` / `include-message`    | `never` |
+| `spring.web.error.include-stacktrace` / `include-message` / `include-binding-errors` | `never` |
 | `logging.structured.format.console`                      | `ecs`   |
+
+> Nota: `server.error.*` está deprecado (level error) desde Boot 4.0.0 y se reemplaza por `spring.web.error.*`; comprobado en el spring-configuration-metadata.json de Boot 4.1.2.

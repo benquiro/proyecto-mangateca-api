@@ -230,6 +230,7 @@ Surefire en `./mvnw verify` (no se añade Failsafe: Principio VII).
 | `-Xlint:processing` con Lombok/MapStruct produce advertencias | **Materializado en T010**: `No processor claimed any of these annotations` en `default-compile` (`SpringBootApplication`) y en `default-testCompile` (anotaciones de Spring/JUnit/Testcontainers). Mitigado con `-Xlint:all,-processing` en ambas ejecuciones; ADR-005 enmendado el 2026-11-05 (R14) |
 | MapStruct 1.6.3 con `--release 25` | Se detecta en el paso 2; si falla, se reabre ADR-002 |
 | Expresar en YAML un `ignore-migration-patterns` vacío | Lo cubre el test de migración *future* en `SchemaDriftIT` (R5) |
+| `server.error.include-*` / `server.error.path` deprecados (level error) en Boot 4.0.0 | Se usa `spring.web.error.*` (T016, T046); comprobado en el metadata de Boot 4.1.2 |
 | Regla JaCoCo vacía en esta feature | Se demuestra con quickstart §4b y se ejercita en la primera feature de negocio |
 
 ## Complexity Tracking

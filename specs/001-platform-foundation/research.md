@@ -131,7 +131,7 @@ Principio III.
     para el 500 genérico con log del detalle.
   - La validación añade la propiedad de extensión `errors: [{field, message}]`.
   - Se usa `type = about:blank` y `title` = frase HTTP estándar.
-  - `server.error.include-stacktrace/message/binding-errors = never`.
+  - `spring.web.error.include-stacktrace/message/binding-errors = never`. `server.error.*` está deprecado (level error) desde Boot 4.0.0 y se reemplaza por `spring.web.error.*`; comprobado en el spring-configuration-metadata.json de Boot 4.1.2.
 - **Rationale**: los handlers de Spring MVC 7 ya traducen las excepciones estándar a
   `ProblemDetail`, así que solo se personalizan la validación y el 500. Al existir un
   `ResponseEntityExceptionHandler` propio, el handler de Boot se desactiva y no hay
