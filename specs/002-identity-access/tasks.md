@@ -79,7 +79,7 @@ modifica; se verifica con un token real en T056.
 
 **⚠️ CRITICAL**: ninguna historia empieza antes de cerrar esta fase.
 
-- [ ] T005 [MIGRATION] Crear `src/main/resources/db/migration/V2__create_identity.sql` (data-model §1 y §2), sin extensiones:
+- [X] T005 [MIGRATION] Crear `src/main/resources/db/migration/V2__create_identity.sql` (data-model §1 y §2), sin extensiones:
   - **`users`**:
     - `id UUID` PK
     - `email VARCHAR(254) NOT NULL`
@@ -104,47 +104,47 @@ modifica; se verifica con un token real en T056.
     - Índices `refresh_tokens_family_idx (family_id)` y `refresh_tokens_user_idx (user_id)`
 
   Cubre FR-002 y FR-015.
-- [ ] T006 [P] [CODE] Crear el módulo y el enum público `Role { CUSTOMER, ADMIN }` en `src/main/java/com/mangateca/api/identity/package-info.java` (`@ApplicationModule(displayName = "Identity")` + `@NullMarked`) y `src/main/java/com/mangateca/api/identity/Role.java`. Javadoc: «cliente»/«CLIENTE» de la spec = `CUSTOMER` (FR-005, FR-021).
-- [ ] T007 [P] [CODE] Crear el VO `Email` en `src/main/java/com/mangateca/api/identity/domain/Email.java` y `src/main/java/com/mangateca/api/identity/domain/package-info.java`. Es un record `Email(String value)` cuyo constructor compacto aplica `trim()` y minúsculas con `Locale.ROOT` y valida la regla mínima de research R11: no vacío, ≤254 caracteres, una sola `@` con ambos lados no vacíos y sin espacios. Si no la cumple, lanza `IllegalArgumentException` (FR-002, research R11).
-- [ ] T008 [CODE] Crear la entidad `User` en `src/main/java/com/mangateca/api/identity/domain/User.java`, sin Lombok:
+- [X] T006 [P] [CODE] Crear el módulo y el enum público `Role { CUSTOMER, ADMIN }` en `src/main/java/com/mangateca/api/identity/package-info.java` (`@ApplicationModule(displayName = "Identity")` + `@NullMarked`) y `src/main/java/com/mangateca/api/identity/Role.java`. Javadoc: «cliente»/«CLIENTE» de la spec = `CUSTOMER` (FR-005, FR-021).
+- [X] T007 [P] [CODE] Crear el VO `Email` en `src/main/java/com/mangateca/api/identity/domain/Email.java` y `src/main/java/com/mangateca/api/identity/domain/package-info.java`. Es un record `Email(String value)` cuyo constructor compacto aplica `trim()` y minúsculas con `Locale.ROOT` y valida la regla mínima de research R11: no vacío, ≤254 caracteres, una sola `@` con ambos lados no vacíos y sin espacios. Si no la cumple, lanza `IllegalArgumentException` (FR-002, research R11).
+- [X] T008 [CODE] Crear la entidad `User` en `src/main/java/com/mangateca/api/identity/domain/User.java`, sin Lombok:
   - Mapeo 1:1 con `users` y `role` como `@Enumerated(EnumType.STRING)`.
   - Constructor protegido para JPA y fábrica `User.register(Email, String displayName, String passwordHash, Role, Clock)`. La fábrica valida el nombre (1–100 caracteres tras `trim()`; si no, `IllegalArgumentException`) y fija `enabled = true`, `failedLoginAttempts = 0`, `lockedUntil = null` y `createdAt`/`updatedAt` desde el `Clock`.
   - Método `disable(Instant now)`, necesario para el escenario «Cuenta deshabilitada».
   - Accesores sin setters públicos.
 
   Depende de T006 y T007 (FR-001, FR-005, FR-011, research R15).
-- [ ] T009 [P] [CODE] Crear la entidad `RefreshToken` en `src/main/java/com/mangateca/api/identity/domain/RefreshToken.java`. Mapeo 1:1 con `refresh_tokens`; `userId` como `UUID`, sin `@ManyToOne`; `tokenHash` como `byte[]`. Fábrica `RefreshToken.issue(UUID userId, byte[] tokenHash, UUID familyId, Instant now, Duration ttl)` con `expiresAt = now + ttl`. Depende de T007 (FR-012, FR-015).
-- [ ] T010 [CODE] Crear `UserRepository` (Spring Data) en `src/main/java/com/mangateca/api/identity/domain/UserRepository.java`:
+- [X] T009 [P] [CODE] Crear la entidad `RefreshToken` en `src/main/java/com/mangateca/api/identity/domain/RefreshToken.java`. Mapeo 1:1 con `refresh_tokens`; `userId` como `UUID`, sin `@ManyToOne`; `tokenHash` como `byte[]`. Fábrica `RefreshToken.issue(UUID userId, byte[] tokenHash, UUID familyId, Instant now, Duration ttl)` con `expiresAt = now + ttl`. Depende de T007 (FR-012, FR-015).
+- [X] T010 [CODE] Crear `UserRepository` (Spring Data) en `src/main/java/com/mangateca/api/identity/domain/UserRepository.java`:
   - `boolean existsByEmail(String)` con JPQL `lower(u.email) = lower(:email)`.
   - `Optional<User> findByEmailForUpdate(String)` con la misma condición y `@Lock(PESSIMISTIC_WRITE)`.
   - `boolean existsByRole(Role)`.
 
   Depende de T008 (data-model §3).
-- [ ] T011 [P] [CODE] Crear `RefreshTokenRepository` (Spring Data) en `src/main/java/com/mangateca/api/identity/domain/RefreshTokenRepository.java`:
+- [X] T011 [P] [CODE] Crear `RefreshTokenRepository` (Spring Data) en `src/main/java/com/mangateca/api/identity/domain/RefreshTokenRepository.java`:
   - `Optional<RefreshToken> findByTokenHashForUpdate(byte[])` con `@Lock(PESSIMISTIC_WRITE)`.
   - `@Modifying int revokeFamily(UUID familyId, Instant now)`: `UPDATE … SET revokedAt = :now WHERE familyId = :familyId AND revokedAt IS NULL`.
 
   Depende de T009 (data-model §3).
-- [ ] T012 [CODE] Crear el record `IdentityProperties` (`@ConfigurationProperties("mangateca.identity")`) en `src/main/java/com/mangateca/api/identity/config/IdentityProperties.java` y `src/main/java/com/mangateca/api/identity/config/package-info.java`. Campos:
+- [X] T012 [CODE] Crear el record `IdentityProperties` (`@ConfigurationProperties("mangateca.identity")`) en `src/main/java/com/mangateca/api/identity/config/IdentityProperties.java` y `src/main/java/com/mangateca/api/identity/config/package-info.java`. Campos:
   - `jwt(issuer, @Nullable Resource privateKeyLocation, @Nullable Resource publicKeyLocation)`.
   - `accessTokenTtl` (por defecto `PT15M`) y `refreshTokenTtl` (por defecto `P7D`).
   - `refreshCookie(sameSite)`: solo `Strict`|`Lax`|`None`, con `Strict` por defecto; cualquier otro valor hace fallar el arranque.
   - `bootstrapAdmin(@Nullable String email, @Nullable String password)`, con `toString()` redefinido para enmascarar la contraseña.
 
   Cubre contracts/configuration.md y research R13.
-- [ ] T013 [CODE] Crear `JwtKeyConfiguration` en `src/main/java/com/mangateca/api/identity/config/JwtKeyConfiguration.java`, anotada con `@EnableConfigurationProperties(IdentityProperties.class)` (único registro de las propiedades). Resuelve el par RSA según la tabla «Resolución de claves» de contracts/configuration.md:
+- [X] T013 [CODE] Crear `JwtKeyConfiguration` en `src/main/java/com/mangateca/api/identity/config/JwtKeyConfiguration.java`, anotada con `@EnableConfigurationProperties(IdentityProperties.class)` (único registro de las propiedades). Resuelve el par RSA según la tabla «Resolución de claves» de contracts/configuration.md:
   - Ambas rutas → `RsaKeyConverters.pkcs8()`/`x509()` y comprobación de que el módulo coincide.
   - Ninguna ruta con `environment.matchesProfiles("dev | test")` → `KeyPairGenerator` RSA 2048 y log INFO sin material de clave.
   - Cualquier otro caso → `IllegalStateException` que nombra las variables que faltan.
 
   Expone los beans `JwtEncoder` (`NimbusJwtEncoder` sobre `ImmutableJWKSet`) y `JwtDecoder` (`NimbusJwtDecoder.withPublicKey(...)` con `JwtValidators.createDefaultWithIssuer(issuer)`). Cubre FR-008 y research R3/R4.
-- [ ] T014 [TEST] Adaptar `src/test/java/com/mangateca/api/TestSecurityConfiguration.java` **inmediatamente después de T013**, porque sus beans `JwtDecoder`/`JwtEncoder` chocan con los de T013. Quitar esos beans y dejar un helper que acuñe tokens de prueba con el `JwtEncoder` del contexto, incluyendo siempre `iss = mangateca-test` (el decoder valida `iss`) y permitiendo fijar `iat`/`exp` y `roles` (plan, Impacto en 001).
-- [ ] T015 [TEST] Adaptar `src/test/java/com/mangateca/api/platform/security/SecurityIT.java` al helper de T014. El caso «firmado con otra clave» sigue generando su propio par local, y se añade el caso «`iss` ajeno → 401» (FR-008, research R3).
-- [ ] T016 [CODE] Eliminar `src/main/java/com/mangateca/api/platform/security/DevJwtDecoderConfiguration.java` (lo sustituye T013; con ambos, el perfil `dev` tendría dos `JwtDecoder`) (research R3).
-- [ ] T017 [CONFIG] Añadir `mangateca.identity.jwt.issuer: http://localhost:8080` en `src/main/resources/application-dev.yaml`, sin rutas de claves (contracts/configuration.md, Perfiles).
-- [ ] T018 [CONFIG] Añadir en `src/main/resources/application.yaml` los valores por defecto de `mangateca.identity`: `access-token-ttl: PT15M`, `refresh-token-ttl: P7D` y `refresh-cookie.same-site: Strict`. Sin `issuer` ni rutas de claves, para que fuera de dev/test sean obligatorias (contracts/configuration.md).
-- [ ] T019 [CODE] Modificar `handleExceptionInternal` en `src/main/java/com/mangateca/api/platform/web/GlobalExceptionHandler.java`: si el `ProblemDetail` trae un `type` distinto de `about:blank`, se conservan su `type` y su `detail` y solo se normalizan `title` e `instance`. Con `about:blank`, el comportamiento de 001 no cambia. Es una regla genérica, sin referencias a clases de `identity`, y el advice sigue siendo único (Constitución IV, FR-020, research R10).
-- [ ] T020 [CODE] Crear `IdentitySecurityConfiguration` en `src/main/java/com/mangateca/api/identity/config/IdentitySecurityConfiguration.java`. Beans:
+- [X] T014 [TEST] Adaptar `src/test/java/com/mangateca/api/TestSecurityConfiguration.java` **inmediatamente después de T013**, porque sus beans `JwtDecoder`/`JwtEncoder` chocan con los de T013. Quitar esos beans y dejar un helper que acuñe tokens de prueba con el `JwtEncoder` del contexto, incluyendo siempre `iss = mangateca-test` (el decoder valida `iss`) y permitiendo fijar `iat`/`exp` y `roles` (plan, Impacto en 001).
+- [X] T015 [TEST] Adaptar `src/test/java/com/mangateca/api/platform/security/SecurityIT.java` al helper de T014. El caso «firmado con otra clave» sigue generando su propio par local, y se añade el caso «`iss` ajeno → 401» (FR-008, research R3).
+- [X] T016 [CODE] Eliminar `src/main/java/com/mangateca/api/platform/security/DevJwtDecoderConfiguration.java` (lo sustituye T013; con ambos, el perfil `dev` tendría dos `JwtDecoder`) (research R3).
+- [X] T017 [CONFIG] Añadir `mangateca.identity.jwt.issuer: http://localhost:8080` en `src/main/resources/application-dev.yaml`, sin rutas de claves (contracts/configuration.md, Perfiles).
+- [X] T018 [CONFIG] Añadir en `src/main/resources/application.yaml` los valores por defecto de `mangateca.identity`: `access-token-ttl: PT15M`, `refresh-token-ttl: P7D` y `refresh-cookie.same-site: Strict`. Sin `issuer` ni rutas de claves, para que fuera de dev/test sean obligatorias (contracts/configuration.md).
+- [X] T019 [CODE] Modificar `handleExceptionInternal` en `src/main/java/com/mangateca/api/platform/web/GlobalExceptionHandler.java`: si el `ProblemDetail` trae un `type` distinto de `about:blank`, se conservan su `type` y su `detail` y solo se normalizan `title` e `instance`. Con `about:blank`, el comportamiento de 001 no cambia. Es una regla genérica, sin referencias a clases de `identity`, y el advice sigue siendo único (Constitución IV, FR-020, research R10).
+- [X] T020 [CODE] Crear `IdentitySecurityConfiguration` en `src/main/java/com/mangateca/api/identity/config/IdentitySecurityConfiguration.java`. Beans:
   - `PasswordEncoder` = `PasswordEncoderFactories.createDelegatingPasswordEncoder()`.
   - `Clock` = `Clock.systemUTC()`.
   - `SecurityFilterChain` con `@Order(1)` y `securityMatcher` exactamente para `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh` y `POST /api/v1/auth/logout`, más su `OPTIONS`: `permitAll()`, `csrf` desactivado, sesión `STATELESS` y `cors(Customizer.withDefaults())`.
