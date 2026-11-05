@@ -420,5 +420,5 @@ secciones obligatorias.
   solo tras su ADR.
 - Esta feature no expone endpoints de negocio, así que la paginación obligatoria aplica a
   partir de los módulos de negocio.
-- La verificación de violaciones modulares (SC-002) se demuestra con fixtures de prueba que no
-  forman parte del código de producción.
+- La detección de violaciones (SC-002) se demuestra introduciendo cambios temporales que se
+  revierten después (procedimiento en `quickstart.md`); esos cambios nunca se integran.
