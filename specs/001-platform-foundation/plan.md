@@ -225,9 +225,12 @@ Surefire en `./mvnw verify` (no se añade Failsafe: Principio VII).
 | Riesgo | Mitigación |
 |--------|------------|
 | `-Xlint:processing` con Lombok/MapStruct produce advertencias | **Materializado en T010**: `No processor claimed any of these annotations` en `default-compile` (`SpringBootApplication`) y en `default-testCompile` (anotaciones de Spring/JUnit/Testcontainers). Mitigado con `-Xlint:all,-processing` en ambas ejecuciones; ADR-005 enmendado el 2026-11-05 (R14) |
-| MapStruct 1.6.3 con `--release 25` | Se detecta en el paso 2; si falla, se reabre ADR-002 |
-| Expresar en YAML un `ignore-migration-patterns` vacío | Lo cubre el test de migración *future* en `SchemaDriftIT` (R5) |
+| MapStruct 1.6.3 con `--release 25` | **Verificado en T010**: compila sin errores ni advertencias; aún sin mappers reales, así que se reabre ADR-002 si el primero falla |
+| Expresar en YAML un `ignore-migration-patterns` vacío | **Resuelto en T029**: la forma `[]` hace fallar el arranque ante una migración aplicada y ausente (`SchemaDriftIT` caso 2; `Detected applied migration not resolved locally: 999`) |
 | `server.error.include-*` / `server.error.path` deprecados (level error) en Boot 4.0.0 | Se usa `spring.web.error.*` (T016, T046); comprobado en el metadata de Boot 4.1.2 |
+| US8-2 (health con la base caída → 503) sin test automatizado | T056 se retiró por caro y no vital (constitución VI); validado a mano en T065 (quickstart §4g: 503 con `db` DOWN) |
+| `build.name` vacío en `/actuator/info` | El `<name/>` del `pom.xml` estaba vacío; corregido a `mangateca-api` en T059. `build.time` muestra `1980-02-01` por el timestamp reproducible del parent de Boot |
+| Lombok `@Slf4j` sin entidades JPA (hallazgo de T066) | Sustituido por loggers SLF4J explícitos; la constitución III limita Lombok a entidades |
 
 ## Complexity Tracking
 

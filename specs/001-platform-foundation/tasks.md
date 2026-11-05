@@ -318,7 +318,7 @@ secciones obligatorias.
 - [X] T064 [P] Revisión de secretos y configuración (FR-023): buscar en el repositorio (`git grep -nE "BEGIN (RSA |)PRIVATE KEY|BEGIN PUBLIC KEY|password:|secret"`) y confirmar que no hay claves ni contraseñas versionadas; asegurar que `.gitignore` incluye `.env`, `*.pem` y `*.key`. Confirmar que ningún log de producción registra tokens, contraseñas ni PII.
 - [X] T065 Validación de punta a punta según `specs/001-platform-foundation/quickstart.md` §1, §2, §3 y §5, y las filas (c), (d), (e), (f) y (g) de §4 (⚠️ los cambios de §4 son TEMPORALES: revertirlos y limpiar con `docker compose down -v`). Registrar cualquier discrepancia y corregirla en la tarea correspondiente, o actualizar quickstart.md si la guía estaba mal.
 - [X] T066 Revisión con el agente `spec-reviewer` del código frente a `spec.md`, `plan.md` y `.specify/memory/constitution.md` (FR-001…FR-026, SC-001…SC-007). Corregir los hallazgos y volver a ejecutar `./mvnw verify`.
-- [ ] T067 Actualizar `specs/001-platform-foundation/plan.md` (*Riesgos* y *Complexity Tracking*) y, si cambió el DDL o alguna propiedad, `data-model.md` y `contracts/configuration.md`, para que reflejen las desviaciones reales encontradas (p. ej. la forma YAML de `ignore-migration-patterns`, la exclusión `-processing` o el comportamiento del entry point 401).
+- [X] T067 Actualizar `specs/001-platform-foundation/plan.md` (*Riesgos* y *Complexity Tracking*) y, si cambió el DDL o alguna propiedad, `data-model.md` y `contracts/configuration.md`, para que reflejen las desviaciones reales encontradas (p. ej. la forma YAML de `ignore-migration-patterns`, la exclusión `-processing` o el comportamiento del entry point 401).
 
 ---
 
