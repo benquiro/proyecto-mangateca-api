@@ -13,14 +13,17 @@ Contexto:
 3. Cambios a revisar: `git status --porcelain` + `git diff HEAD` + el contenido completo de los archivos nuevos (untracked).
 
 Revisa, en este orden:
-1. Requisitos: los FR-xxx y escenarios de aceptación que las tareas completadas dicen cubrir, ¿están cubiertos de verdad y tienen test?
-2. Constitución: ¿se violó algún principio (MUST/SHOULD)?
-3. Plan: desviaciones en estructura, dependencias, configuración o contratos de API.
-4. Arquitectura modular (Spring Modulith): acceso a paquetes internos de otro módulo, ciclos, comunicación entre módulos que no sea por API pública o eventos.
-5. Persistencia: migraciones Flyway ya existentes modificadas (severidad alta), cambios de esquema fuera de migraciones, N+1, transacciones mal delimitadas.
-6. API y seguridad: entidades JPA expuestas, errores que no salen como ProblemDetail o filtran trazas, rutas públicas no declaradas, CORS con comodín.
-7. Calidad Spring: inyección por campo en vez de constructor, excepciones tragadas, APIs deprecadas o experimentales, advertencias de compilación.
-8. Ejecuta ./mvnw verify y reporta: tests fallidos, cobertura JaCoCo vs. 80% y advertencias.
+1. Requisitos: los FR-xxx y escenarios de aceptación que las tareas completadas dicen cubrir, ¿están cubiertos de verdad?
+2. Tests (Principio VI): ¿existen los tests obligatorios que corresponden a los cambios (arquitectura y smoke test de arranque, invariantes de dominio, seguridad crítica incluida la anti IDOR/BOLA, flujo feliz de endpoints críticos)? ¿Se mockean entidades, records o VOs, o algo fuera de lo permitido (repositorios, pasarela simulada, Clock y, en @WebMvcTest, la capa de aplicación)? ¿Algún test usa H2 o la base de desarrollo? No exijas tests opcionales ni cobertura.
+3. Constitución: ¿se violó algún principio (MUST/SHOULD)?
+4. Plan: desviaciones en estructura, dependencias, configuración o contratos de API. Toda dependencia nueva en pom.xml debe tener su ADR.
+5. Arquitectura modular (Spring Modulith): acceso a paquetes internos de otro módulo, ciclos, comunicación entre módulos que no sea por API pública o eventos.
+6. Simplicidad (Principio VII): interfaces especulativas (solo se permiten fachada pública de módulo, puerto externo o ≥ 2 implementaciones reales), patrones o divisiones de clases sin trade-off documentado en plan.md.
+7. Persistencia: migraciones Flyway ya existentes modificadas (severidad alta), cambios de esquema fuera de migraciones, N+1, @Transactional fuera de la capa de aplicación o sin readOnly = true en consultas, listados sin paginar o sin tamaño máximo.
+8. API y seguridad: entidades JPA expuestas, DTOs que no son record o sin @Valid, errores que no salen como ProblemDetail o filtran trazas, endpoints anónimos fuera de la lista del Principio V, falta de @PreAuthorize en la autorización de negocio, identidad tomada de parámetros del cliente en vez del token, CORS con comodín, Actuator exponiendo algo más que health e info.
+9. Higiene: secretos, credenciales o claves de firma versionados (severidad alta); contraseñas, tokens o PII en logs.
+10. Calidad Java/Spring: inyección por campo en vez de constructor, excepciones tragadas, APIs deprecadas, experimentales o preview, paquetes sin @NullMarked, colecciones que retornan null, Lombok fuera de entidades JPA o @Data en ellas, dinero con double/float.
+11. Ejecuta ./mvnw verify y reporta tests fallidos y advertencias de compilación (cualquier advertencia es un fallo; la única exclusión permitida es la categoría processing).
 
 Entrega una tabla: severidad (alta/media/baja) | archivo:línea | requisito o principio incumplido | corrección sugerida.
 Termina con un veredicto: LISTO PARA COMMIT o REQUIERE CAMBIOS. Si todo está bien, dilo sin inventar hallazgos.
