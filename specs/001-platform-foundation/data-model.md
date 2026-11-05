@@ -98,4 +98,4 @@ Nombre de archivo: `ADR-NNN-<slug>.md`. Secciones obligatorias:
 | ADR-002 | Mapeo entidad↔DTO en compilación           | `mapstruct` / `mapstruct-processor` 1.6.3, `lombok-mapstruct-binding` 0.2.0 |
 | ADR-003 | Autenticación stateless (resource server)  | `spring-boot-starter-security-oauth2-resource-server`                      |
 | ADR-004 | Infraestructura local en desarrollo        | `spring-boot-docker-compose` (optional), `compose.yaml`                    |
-| ADR-005 | Puerta de calidad                          | `jacoco-maven-plugin` 0.8.16, `-Xlint:all` + `failOnWarning`               |
+| ADR-005 | Puerta de calidad                          | `-Xlint:all,-processing` + `failOnWarning` (sin JaCoCo)                    |

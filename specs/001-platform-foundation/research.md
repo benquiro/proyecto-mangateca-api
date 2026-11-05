@@ -228,24 +228,16 @@ Principio III.
 - **Riesgo**: compatibilidad de MapStruct 1.6.3 con `--release 25`. Mitigación: la build con
   `-Werror` lo detecta en la primera tarea y, si falla, se reabre ADR-002.
 
-## R14. Puerta de calidad: JaCoCo y `-Xlint:all -Werror`
+## R14. Puerta de calidad: `-Xlint:all,-processing -Werror`
 
-- **Decision**:
-  - `jacoco-maven-plugin` **0.8.16**, con los goals `prepare-agent`, `report` y `check`
-    (fase `verify`). Regla `BUNDLE`, `LINE COVEREDRATIO >= 0.80`, aplicada a
-    `com/mangateca/api/**/domain/**` y `com/mangateca/api/**/application/**`.
-  - `maven-compiler-plugin`: `<compilerArgs>-Xlint:all</compilerArgs>` y
-    `<failOnWarning>true</failOnWarning>`, en `compile` y en `testCompile`.
-- **Rationale**: el alcance lo fija la constitución (dominio y aplicación). La plataforma se
-  prueba igualmente con slice tests e integración. 0.8.16 es la última GA y soporta el bytecode
-  de Java 25.
-- **Consecuencia conocida**: en esta feature no hay clases de dominio ni de aplicación, así que
-  la regla se evalúa sobre un conjunto vacío. Su eficacia se demuestra con el procedimiento
-  temporal de `quickstart.md` (US7-1), y la primera feature de negocio la ejercita de verdad.
-- **Riesgo**: `-Xlint:processing` puede emitir "No processor claimed any of these annotations"
-  con Lombok o MapStruct. Mitigación: verificarlo en la primera build. Si aparece, solo se
-  puede excluir esa categoría (`-Xlint:all,-processing`) mediante una enmienda justificada en
-  ADR-005 y en *Complexity Tracking*. Nunca en silencio.
+- **Decision**: `maven-compiler-plugin` con `-Xlint:all,-processing` y
+  `<failOnWarning>true</failOnWarning>`, en `compile` y en `testCompile`.
+- **Rationale**: FR-014 (cero advertencias) con el compilador nativo, sin dependencias.
+- **Retirado (2026-11-05)**: el umbral JaCoCo ≥ 80% (FR-013), porque la constitución v2.0.0 ya
+  no exige cobertura. JaCoCo no se añade al `pom.xml`.
+- **Riesgo materializado**: `-Xlint:processing` emite "No processor claimed any of these
+  annotations" con Lombok/MapStruct (T010). Se excluye solo esa categoría, según la
+  constitución v3.0.0 y ADR-005.
 
 ## R15. JSpecify
 

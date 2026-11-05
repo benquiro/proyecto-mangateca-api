@@ -16,8 +16,8 @@ La feature incluye:
   de seguridad y CORS.
 - **Seguridad**: deny-by-default como OAuth2 Resource Server JWT.
 - **Operación**: Actuator limitado a `health`/`info` y OpenAPI público.
-- **Gobierno automático**: `ApplicationModules.verify()`, JaCoCo al 80% en dominio/aplicación
-  y `-Xlint:all` con `failOnWarning`.
+- **Gobierno automático**: `ApplicationModules.verify()` y `-Xlint:all,-processing` con
+  `failOnWarning` (sin umbral de cobertura: constitución v2.0.0).
 
 Cada dependencia nueva entra precedida de su ADR (ADR-001 a ADR-005). Las decisiones técnicas
 y sus fuentes están en [research.md](research.md).
@@ -35,22 +35,20 @@ y sus fuentes están en [research.md](research.md).
   - `spring-boot-starter-security-oauth2-resource-server`
   - `spring-boot-docker-compose`
   - MapStruct 1.6.3 + `lombok-mapstruct-binding` 0.2.0
-  - `jacoco-maven-plugin` 0.8.16
 
 **Storage**: PostgreSQL 18 (`postgres:18`), Flyway (`db/migration/V1__init_schema.sql`)
 
 **Testing**:
 
 - JUnit 5 y AssertJ.
-- Slices: `@WebMvcTest` para errores (`GlobalExceptionHandlerTests`,
-  `ProblemDetailsErrorControllerTests`) y para la autorización de controladores
-  (`ProbeSecurityWebMvcTests`), según la Constitución §VI.
+- Alcance (constitución §VI, testing pragmático): solo tests vitales (arquitectura y arranque,
+  seguridad crítica, errores sin fugas, esquema). Sin umbral de cobertura.
+- Slice: `@WebMvcTest` para errores (`GlobalExceptionHandlerTests`).
 - Integración: `@SpringBootTest` (RANDOM_PORT) + Testcontainers `@ServiceConnection`, con
   `RestTestClient` (`@AutoConfigureRestTestClient`) del módulo `spring-boot-resttestclient`, que
   ya llega de forma transitiva vía `spring-boot-starter-webmvc-test` (sin dependencias nuevas).
 - Surefire ejecuta `**/*Tests.java` y `**/*IT.java` (`<includes>` explícito: por defecto ignora
   `*IT`).
-- Módulos: `@ApplicationModuleTest`.
 - Arquitectura: `ApplicationModules.verify()`.
 - JWT de prueba firmados con `NimbusJwtEncoder` y un par RSA efímero.
 
@@ -98,7 +96,7 @@ Docker.
 | V | Refresh tokens / bcrypt | Fuera de alcance (módulo identity) | — |
 | VI | Testcontainers real, sin H2 | `postgres:18` con `@ServiceConnection`; excepción en `SchemaDriftIT`, que usa su propio contenedor sin `@ServiceConnection` (ver Complexity Tracking) | ✅ (con excepción) |
 | VI | Mocks solo en I/O | No hay mocks; los JWT son reales firmados con una clave efímera | ✅ |
-| VI | JaCoCo ≥ 80% dominio/aplicación; `-Xlint:all` | R14 (incluye la limitación del conjunto vacío y el riesgo de `processing`) | ✅ |
+| VI | Solo tests vitales, sin umbral de cobertura; `-Xlint:all,-processing` + `failOnWarning` | R14; excepción `processing` permitida por la constitución v3.0.0 | ✅ |
 | VII | Simplicidad, sin interfaces especulativas | Todas las clases son concretas; las únicas interfaces implementadas son contratos del framework (`AuthenticationEntryPoint`, `AccessDeniedHandler`, `ErrorController`) | ✅ |
 | VII | Trade-offs documentados | Ver la sección "Evaluación de trade-offs" | ✅ |
 | Hig. | Secretos por entorno; CORS sin `*`; Actuator `health`/`info`; logs ECS | contracts/configuration.md | ✅ |
@@ -148,7 +146,7 @@ docs/adr/
 ├── ADR-003-oauth2-resource-server.md
 ├── ADR-004-docker-compose-dev.md
 └── ADR-005-quality-gate.md
-pom.xml                                        # + deps, BOM Modulith, JaCoCo, -Xlint, build-info, perfil dev en spring-boot:run
+pom.xml                                        # + deps, BOM Modulith, -Xlint, build-info, perfil dev en spring-boot:run
 README.md                                      # sección "Arranque local"
 
 src/main/java/com/mangateca/api/
@@ -180,25 +178,18 @@ src/test/java/com/mangateca/api/
 ├── TestApiApplication.java                    # existente, + TestSecurityConfiguration
 ├── TestcontainersConfiguration.java           # existente; imagen fijada a postgres:18
 ├── TestSecurityConfiguration.java             # par RSA efímero: JwtDecoder + JwtEncoder
-├── ModularityTests.java                       # ApplicationModules.verify() + documentación
+├── ModularityTests.java                       # ApplicationModules.verify() + módulo platform
 ├── persistence/
 │   ├── FlywayMigrationIT.java                 # V1 aplicada; event_publication existe; sin tablas de negocio
 │   ├── SchemaDriftIT.java                     # checksum alterado / migración future / entidad sin tabla → fallo de arranque
 │   └── TestDatabaseIsolationIT.java           # postgres 18 efímero de Testcontainers, nunca la base de Compose ni H2
-├── actuator/
-│   ├── HealthEndpointIT.java                  # público; app + db UP; sin detalles
-│   ├── InfoEndpointIT.java                    # público; solo build.name y build.version
-│   └── HealthDatabaseDownIT.java              # contenedor propio detenido → 503 DOWN
-├── openapi/OpenApiDocsIT.java                 # /v3/api-docs y swagger-ui públicos
+├── actuator/ActuatorAndDocsIT.java            # health sin detalles, info mínimo, OpenAPI 3 con bearerAuth
 └── platform/
-    ├── PlatformModuleTests.java               # @ApplicationModuleTest
     ├── web/
     │   ├── GlobalExceptionHandlerTests.java   # @WebMvcTest: 400/400+errors/404/405/415/500
-    │   ├── ProblemDetailsErrorControllerTests.java # @WebMvcTest: atributos de error → Problem Details, sin fugas
     │   ├── ErrorDispatchIT.java               # excepción en filtro → /error → 500 Problem Details
     │   └── ProbeController.java               # controlador de prueba (solo en test)
     └── security/
-        ├── ProbeSecurityWebMvcTests.java      # @WebMvcTest + SecurityConfiguration: 401/403/200 por rol
         ├── SecurityIT.java                    # 401 (sin/inválido/expirado/otra clave), 403 por rol, rutas públicas
         ├── CorsIT.java                        # origen permitido / no permitido / preflight
         └── CorsPropertiesTests.java           # unitario: rechaza *, mal formados; vacío = ninguno
@@ -220,14 +211,14 @@ Surefire en `./mvnw verify` (no se añade Failsafe: Principio VII).
 ## Orden de implementación (guía para `/speckit-tasks`)
 
 1. **ADRs** (ADR-001…005). Se escriben antes de modificar el `pom.xml`.
-2. **`pom.xml`**: dependencias, BOM, procesadores, `-Xlint:all` + `failOnWarning`, JaCoCo,
+2. **`pom.xml`**: dependencias, BOM, procesadores, `-Xlint:all,-processing` + `failOnWarning`,
    `build-info` y perfil dev. Verificación: `./mvnw compile` sin advertencias.
 3. **Persistencia**: `compose.yaml`, `application*.yaml`, V1, imagen de Testcontainers y tests de
    migración y drift.
 4. **Errores**: `GlobalExceptionHandler` + `GlobalExceptionHandlerTests`.
 5. **Seguridad**: `SecurityConfiguration`, handlers PD, CORS, decoder dev y tests.
 6. **Observabilidad y OpenAPI**: configuración + tests.
-7. **Arquitectura**: `ModularityTests`, `PlatformModuleTests`; README y quickstart verificados.
+7. **Arquitectura**: `ModularityTests`; README y quickstart verificados.
 
 ## Riesgos
 
@@ -237,11 +228,11 @@ Surefire en `./mvnw verify` (no se añade Failsafe: Principio VII).
 | MapStruct 1.6.3 con `--release 25` | Se detecta en el paso 2; si falla, se reabre ADR-002 |
 | Expresar en YAML un `ignore-migration-patterns` vacío | Lo cubre el test de migración *future* en `SchemaDriftIT` (R5) |
 | `server.error.include-*` / `server.error.path` deprecados (level error) en Boot 4.0.0 | Se usa `spring.web.error.*` (T016, T046); comprobado en el metadata de Boot 4.1.2 |
-| Regla JaCoCo vacía en esta feature | Se demuestra con quickstart §4b y se ejercita en la primera feature de negocio |
 
 ## Complexity Tracking
 
-Se trata de una **desviación explícita del texto literal del Principio VI** (`.specify/memory/constitution.md` L172: "cero advertencias con `-Xlint:all`"), aprobada por el usuario el 2026-11-05 y justificada en ADR-005 (enmienda del 2026-11-05). Queda pendiente formalizarla con una enmienda PATCH de la constitución mediante su procedimiento de gobierno, cuya decisión corresponde al usuario. Hasta entonces, la constitución prevalece sobre los artefactos inferiores (constitution.md L18).
+La exclusión `-processing` quedó formalizada en la constitución v3.0.0 (§VI, 2026-11-05) y
+está justificada en ADR-005; se mantiene aquí como registro de la desviación original.
 
 | Desviación | Por qué | Alternativa descartada |
 |------------|---------|------------------------|

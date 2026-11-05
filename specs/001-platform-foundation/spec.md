@@ -198,16 +198,12 @@ calidad de la constitución.
 **Why this priority**: evita que la deuda se acumule desde el primer módulo; no bloquea la
 demostración del esqueleto.
 
-**Independent Test**: introducir código sin pruebas que baje la cobertura del umbral, y
-código que genere una advertencia de compilación; verificar que el build falla en ambos casos.
+**Independent Test**: introducir código que genere una advertencia de compilación y verificar
+que el build falla. (Sin umbral de cobertura: constitución v2.0.0, §VI.)
 
 **Acceptance Scenarios**:
 
-1. **Given** un cambio que reduce la cobertura de líneas de las capas de dominio y aplicación
-   por debajo del 80%,
-   **When** se ejecuta el build,
-   **Then** el build falla indicando la cobertura obtenida y el umbral exigido.
-2. **Given** un cambio que produce al menos una advertencia de compilación,
+1. **Given** un cambio que produce al menos una advertencia de compilación,
    **When** se ejecuta el build,
    **Then** el build falla mostrando la advertencia.
 
@@ -256,8 +252,8 @@ secciones obligatorias.
    **Then** existen ADR-001 (verificación de arquitectura modular y eventos de dominio),
    ADR-002 (mapeo entre entidades y DTOs en tiempo de compilación), ADR-003 (autenticación
    stateless como servidor de recursos), ADR-004 (aprovisionamiento automático de
-   infraestructura local en desarrollo) y ADR-005 (puerta de calidad de cobertura y
-   compilación sin advertencias).
+   infraestructura local en desarrollo) y ADR-005 (puerta de calidad: compilación sin
+   advertencias).
 2. **Given** cualquiera de esos ADR,
    **When** se lee,
    **Then** contiene las siete secciones obligatorias de FR-001; en particular, expone el
@@ -334,8 +330,8 @@ secciones obligatorias.
 - **FR-012**: El código MUST organizarse en módulos de dominio vertical, y el build MUST fallar
   si un módulo accede a componentes internos de otro o si existe un ciclo de dependencias entre
   módulos.
-- **FR-013**: El build MUST fallar si la cobertura de líneas de las capas de dominio y
-  aplicación es inferior al 80%.
+- **FR-013**: *(Retirado el 2026-11-05: la constitución v2.0.0 elimina el umbral de cobertura
+  obligatorio.)*
 - **FR-014**: El build MUST fallar si la compilación produce cualquier advertencia.
 
 **Errores**
@@ -391,7 +387,7 @@ secciones obligatorias.
   localmente con un único comando, sin instalar una base de datos, en menos de 10 minutos
   (incluida la primera descarga de imágenes).
 - **SC-002**: El 100% de las violaciones introducidas intencionalmente (acceso indebido entre
-  módulos, ciclo entre módulos, cobertura bajo el umbral, advertencia de compilación) hacen
+  módulos, ciclo entre módulos, advertencia de compilación) hacen
   fallar el build, sin depender de revisión manual.
 - **SC-003**: El 100% de las respuestas de error del catálogo de escenarios (400, 401, 403,
   404, 405, 415, 500) siguen el formato Problem Details, y el 0% contiene trazas de pila,
@@ -419,8 +415,6 @@ secciones obligatorias.
 - El endpoint de salud muestra a usuarios anónimos solo el estado (arriba/abajo) de la
   aplicación y de la base de datos, sin detalles como versiones, hosts o credenciales.
 - El endpoint de información expone únicamente el nombre y la versión de la aplicación.
-- La cobertura se mide sobre las capas de dominio y aplicación según la constitución; las
-  exclusiones (clases de arranque y configuración) se documentan en ADR-005.
 - Las dependencias base del `pom.xml` inicial se conservan; las capacidades nuevas se añaden
   solo tras su ADR.
 - Esta feature no expone endpoints de negocio, así que la paginación obligatoria aplica a

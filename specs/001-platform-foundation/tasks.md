@@ -10,9 +10,10 @@ description: "Lista de tareas de la feature 001 - Platform Foundation"
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/ (http-surface.md,
 configuration.md, problem-details.schema.json) y quickstart.md
 
-**Tests**: SE INCLUYEN. La spec define pruebas independientes por historia, el plan lista los
-tests y la constitución (Principio VI y DoD) los exige. Los tests de cada historia se escriben
-**primero** y deben fallar antes de implementar.
+**Tests**: solo los **vitales** (constitución v2.0.0+, §VI: arquitectura y arranque, seguridad
+crítica, errores sin fugas, esquema). Sin umbral de cobertura. Escribirlos primero es
+recomendable, no obligatorio. Las tareas ~~tachadas~~ se retiraron el 2026-11-05 (sin casilla:
+`/speckit-implement` las omite).
 
 **Organization**: tareas agrupadas por historia de usuario para implementarlas y probarlas de
 forma independiente.
@@ -82,7 +83,7 @@ repositorio oficial del proyecto.
 - [X] T002 [P] Escribir `docs/adr/ADR-002-mapstruct.md` (fuente: research R13). Problema: el Principio IV exige mapeo entidad↔DTO con MapStruct, verificado en compilación. Alternativas: mapeo manual en records (opción nativa, descartada porque el Principio IV exige MapStruct) y ModelMapper (reflexión en runtime). Decisión: `org.mapstruct:mapstruct` 1.6.3 (compile), `org.mapstruct:mapstruct-processor` 1.6.3 y `org.projectlombok:lombok-mapstruct-binding` 0.2.0 en `annotationProcessorPaths`, en el orden Lombok → binding → MapStruct. Consecuencias: no se crea ningún mapper hasta que exista un DTO real. Riesgo: compatibilidad con `--release 25`, que se verifica en T010.
 - [X] T003 [P] Escribir `docs/adr/ADR-003-oauth2-resource-server.md` (fuente: research R8). Problema: autenticación stateless con tokens bearer emitidos por el futuro módulo de identidad (FR-021). Alternativas: librerías JWT de terceros y filtros manuales (prohibidos por el Principio V), HMAC con secreto compartido, una clave pública de dev versionada, y el starter `spring-boot-starter-oauth2-resource-server` (deprecado en Boot 4.1.2). Decisión: `org.springframework.boot:spring-boot-starter-security-oauth2-resource-server` (versión gestionada por el parent 4.1.2). Consecuencias: fuera de dev, `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION` es obligatoria (fail-fast); en dev se usa un par RSA efímero en memoria; en tests, `NimbusJwtEncoder` con una clave efímera; la cabecera del 401 es siempre `WWW-Authenticate: Bearer`, sin `error`/`error_description` (research R10); **CSRF desactivado** (research R8): la autenticación viaja solo en la cabecera `Authorization`, que un sitio ajeno no puede adjuntar, y con CSRF activo un POST sin credenciales recibiría 403 en vez de 401 (SC-004). **Deuda registrada**: el módulo identity MUST reevaluar CSRF para el endpoint de refresh, que usará cookie con `allowCredentials=true` (p. ej. `SameSite=Strict` y CSRF solo en esa ruta).
 - [X] T004 [P] Escribir `docs/adr/ADR-004-docker-compose-dev.md` (fuente: research R4 y R6). Problema: arrancar en local con un único comando sin instalar PostgreSQL (US1, FR-003, FR-004). Alternativas: instalación manual de PostgreSQL, `TestApiApplication` con Testcontainers como modo dev (la base se pierde en cada reinicio) y un script `docker compose up` aparte (dos comandos). Decisión: `org.springframework.boot:spring-boot-docker-compose` con `<optional>true</optional>` y un `compose.yaml` en la raíz con `postgres:18`, `lifecycle-management` `start-and-stop`. Consecuencias: requiere Docker; se omite en tests y no se incluye en el jar reempaquetado; la imagen es idéntica a la de Testcontainers.
-- [X] T005 [P] Escribir `docs/adr/ADR-005-quality-gate.md` (fuente: research R14). Problema: FR-013 (cobertura de líneas ≥ 80% en dominio y aplicación) y FR-014 (cero advertencias). Alternativas: revisión manual sin umbral (opción nativa), herramientas SaaS externas y otros plugins de cobertura. Decisión: `org.jacoco:jacoco-maven-plugin` 0.8.16 (goals `prepare-agent`, `report` y `check` en `verify`; regla `BUNDLE`, `LINE` `COVEREDRATIO` mínimo `0.80`, sobre `com/mangateca/api/**/domain/**` y `com/mangateca/api/**/application/**`) y `maven-compiler-plugin` con `-Xlint:all` y `<failOnWarning>true</failOnWarning>` en `compile` y `testCompile`. Exclusiones documentadas (supuesto de la spec): clases de arranque (`ApiApplication`) y de configuración, que quedan fuera por estar fuera de los paquetes `domain`/`application`. Consecuencias: en esta feature la regla se evalúa sobre un conjunto vacío (se demuestra en quickstart §4b). Riesgo: `-Xlint:processing`, que se verifica en T010.
+- [X] T005 [P] Escribir `docs/adr/ADR-005-quality-gate.md` (fuente: research R14). Problema: FR-013 (cobertura de líneas ≥ 80% en dominio y aplicación) y FR-014 (cero advertencias). Alternativas: revisión manual sin umbral (opción nativa), herramientas SaaS externas y otros plugins de cobertura. Decisión: `org.jacoco:jacoco-maven-plugin` 0.8.16 (goals `prepare-agent`, `report` y `check` en `verify`; regla `BUNDLE`, `LINE` `COVEREDRATIO` mínimo `0.80`, sobre `com/mangateca/api/**/domain/**` y `com/mangateca/api/**/application/**`) y `maven-compiler-plugin` con `-Xlint:all` y `<failOnWarning>true</failOnWarning>` en `compile` y `testCompile`. Exclusiones documentadas (supuesto de la spec): clases de arranque (`ApiApplication`) y de configuración, que quedan fuera por estar fuera de los paquetes `domain`/`application`. Consecuencias: en esta feature la regla se evalúa sobre un conjunto vacío (se demuestra en quickstart §4b). Riesgo: `-Xlint:processing`, que se verifica en T010. **Enmienda (2026-11-05)**: JaCoCo retirado (constitución v2.0.0, FR-013 retirado); ADR-005 queda solo con `-Xlint:all,-processing` + `failOnWarning`.
 - [X] T006 Modificar `pom.xml`: añadir en `<dependencyManagement>` el BOM `org.springframework.modulith:spring-modulith-bom` 2.1.2 (`<type>pom</type>`, `<scope>import</scope>`, versión en la propiedad `spring-modulith.version`), y en `<dependencies>` `spring-modulith-starter-jdbc` (compile) y `spring-modulith-starter-test` (`<scope>test</scope>`), sin versión. No eliminar ninguna dependencia existente (Principio III). Depende de T001.
 - [X] T007 Modificar `pom.xml`: añadir `org.springframework.boot:spring-boot-starter-security-oauth2-resource-server` sin versión. NO usar el deprecado `spring-boot-starter-oauth2-resource-server`. `spring-security-test` ya llega vía `spring-boot-starter-security-test`. Depende de T003 y T006.
 - [X] T008 Modificar `pom.xml`: añadir `org.springframework.boot:spring-boot-docker-compose` con `<optional>true</optional>` y sin versión. Depende de T004 y T007.
@@ -170,7 +171,7 @@ públicas → acceso concedido.
 - [X] T030 [P] [US3] Crear `src/test/java/com/mangateca/api/platform/security/CorsPropertiesTests.java` (unitario, sin contexto, más un `ApplicationContextRunner` con `@EnableConfigurationProperties(CorsProperties.class)` para el binding). Casos: lista vacía o ausente → `allowedOrigins()` vacía (falla cerrado, nunca "todos"); `null` → lista vacía; `http://localhost:5173` y `https://app.example.com:8443` → aceptados; `*` → rechazado; `https://app.example.com/` (barra final), `https://app.example.com/path`, `app.example.com` (sin esquema) y `ftp://x` → rechazados; con `mangateca.cors.allowed-origins=*` el contexto del runner falla al arrancar (`hasFailed()`). Invariantes de data-model.md: "Sin `null`; ningún valor `*`; cada valor es `scheme://host[:port]` sin ruta ni barra final".
 - [X] T031 [P] [US3] Crear `src/test/java/com/mangateca/api/platform/security/SecurityIT.java` (`@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@AutoConfigureRestTestClient`, imports estándar, `RestTestClient` inyectado; ver Convenciones). Firmar los tokens con el `JwtEncoder` de `TestSecurityConfiguration`. Casos: (1) `GET /api/v1/probes?size=1` sin token → 401; (2) `GET /api/v1/no-existe` sin token → 401, no 404 (deny-by-default antes de resolver la ruta); (3) `POST /api/v1/probes` sin token → 401, no 403 (CSRF desactivado); (4) token `x.y.z` malformado, token firmado con otra clave y token expirado → 401 los tres, con **cuerpo y cabecera `WWW-Authenticate` idénticos entre sí**: la cabecera empieza por `Bearer` y no contiene `error_description` (no revela qué comprobación falló); (5) todo 401 es Problem Details (`Content-Type: application/problem+json`, `status` 401, `title` `Unauthorized`, `instance` = ruta) sin información interna; (6) token con `roles: [CUSTOMER]` en `GET /api/v1/probes/admin` → 403 Problem Details (`title` `Forbidden`); con `roles: [ADMIN]` → 200; (7) token válido en `GET /api/v1/probes?size=1` → 200; (8) sin token, `/actuator/health`, `/actuator/info`, `/v3/api-docs` y `/swagger-ui.html` → ni 401 ni 403; (9) `/actuator/env` sin token → 401 y con token válido → 404 (no expuesto); (10) ninguna respuesta incluye `Set-Cookie` con `JSESSIONID` (stateless); (11) con `@ExtendWith(OutputCaptureExtension.class)`, la salida capturada durante los casos (4), (6) y (7) no contiene el texto de ningún token enviado (FR-018: nunca registrar tokens).
 - [X] T032 [P] [US3] Crear `src/test/java/com/mangateca/api/platform/security/CorsIT.java` (`@SpringBootTest(webEnvironment = RANDOM_PORT, properties = "mangateca.cors.allowed-origins=http://localhost:5173")`, imports estándar). Casos: (1) `GET /actuator/health` con `Origin: http://localhost:5173` → 200 con `Access-Control-Allow-Origin: http://localhost:5173` (nunca `*`), `Access-Control-Allow-Credentials: true` y `Vary` que contiene `Origin`; (2) preflight `OPTIONS /api/v1/probes` con ese origen y `Access-Control-Request-Method: POST`, **sin token** → 200, con `Access-Control-Allow-Methods` que incluye `GET, POST, PUT, PATCH, DELETE` y `Access-Control-Allow-Headers` que admite `Authorization` y `Content-Type`; (3) `GET /actuator/health` con `Origin: https://evil.example` → 403 Problem Details (`title` `Forbidden`) sin ninguna cabecera `Access-Control-Allow-*`; (4) preflight desde `https://evil.example` → 403 Problem Details sin cabeceras `Access-Control-Allow-*`. Añadir una clase `@Nested` (o un segundo IT) **sin** la propiedad, en la que cualquier `Origin` cruzado recibe 403 Problem Details (falla cerrado).
-- [X] T033 [P] [US3] Crear `src/test/java/com/mangateca/api/platform/security/ProbeSecurityWebMvcTests.java`, el slice que exige la constitución (§VI: "Los controladores y su autorización MUST probarse con `@WebMvcTest`"). `@WebMvcTest(ProbeController.class)` + `@Import({SecurityConfiguration.class, ProblemDetailsResponseWriter.class, ProblemDetailsAuthenticationEntryPoint.class, ProblemDetailsAccessDeniedHandler.class, TestSecurityConfiguration.class})` y MockMvc. Los tokens son **reales**: firmados con el `JwtEncoder` de `TestSecurityConfiguration` y enviados en `Authorization: Bearer`, para ejercitar el `JwtAuthenticationConverter` del claim `roles`; no usar `jwt()` ni `@WithMockUser`. Casos: (1) `GET /api/v1/probes/admin` sin token → 401 Problem Details con `WWW-Authenticate: Bearer`; (2) con `roles: [CUSTOMER]` → 403 Problem Details; (3) con `roles: [ADMIN]` → 200; (4) `GET /api/v1/probes?size=1` con `roles: [CUSTOMER]` → 200 (autenticado basta); (5) `POST /api/v1/probes` sin token → 401 (CSRF desactivado). Si el slice no carga `CorsProperties`, añadir `@EnableConfigurationProperties` o importar lo necesario, sin tocar producción.
+- [X] T033 [P] [US3] Crear `src/test/java/com/mangateca/api/platform/security/ProbeSecurityWebMvcTests.java`, slice de autorización. `@WebMvcTest(ProbeController.class)` + `@Import({SecurityConfiguration.class, ProblemDetailsResponseWriter.class, ProblemDetailsAuthenticationEntryPoint.class, ProblemDetailsAccessDeniedHandler.class, TestSecurityConfiguration.class})` y MockMvc. Los tokens son **reales**: firmados con el `JwtEncoder` de `TestSecurityConfiguration` y enviados en `Authorization: Bearer`, para ejercitar el `JwtAuthenticationConverter` del claim `roles`; no usar `jwt()` ni `@WithMockUser`. Casos: (1) `GET /api/v1/probes/admin` sin token → 401 Problem Details con `WWW-Authenticate: Bearer`; (2) con `roles: [CUSTOMER]` → 403 Problem Details; (3) con `roles: [ADMIN]` → 200; (4) `GET /api/v1/probes?size=1` con `roles: [CUSTOMER]` → 200 (autenticado basta); (5) `POST /api/v1/probes` sin token → 401 (CSRF desactivado). Si el slice no carga `CorsProperties`, añadir `@EnableConfigurationProperties` o importar lo necesario, sin tocar producción. **Retirado (2026-11-05)**: archivo eliminado por duplicar los casos de `SecurityIT` (T031); con la constitución v2.0.0 el slice ya no es obligatorio.
 
 ### Implementation for User Story 3
 
@@ -199,7 +200,7 @@ la ausencia de información interna.
 
 - [X] T042 [US4] Crear `src/test/java/com/mangateca/api/platform/web/GlobalExceptionHandlerTests.java` (`@WebMvcTest(ProbeController.class)` + `@Import(GlobalExceptionHandler.class)`, MockMvc, `@ExtendWith(OutputCaptureExtension.class)`). El slice no depende de `SecurityConfiguration`: el consumidor autenticado se simula con `SecurityMockMvcRequestPostProcessors.jwt()` y `csrf()`. Casos, todos con `Content-Type: application/problem+json`, `type` `about:blank`, `title` estándar, `status` igual al HTTP, `instance` = ruta y sin información interna: (1) `POST /api/v1/probes` con JSON malformado `{"name":` → 400; (2) `POST` con `{"name":"","quantity":-1}` → 400 con `errors` de **2** elementos `{field, message}` (`name` y `quantity`), cada uno con `message` no vacío (todos los campos en una única respuesta); (3) `GET /api/v1/probes?size=0` → 400 (`HandlerMethodValidationException`) con `errors` que incluye `size`; (4) `GET /api/v1/no-existe` → 404; (5) `DELETE /api/v1/probes` → 405 con cabecera `Allow`; (6) `POST /api/v1/probes` con `Content-Type: text/plain` → 415; (7) `GET /api/v1/probes/failure` → 500, cuyo cuerpo NO contiene `detalle interno`, `SELECT` ni `IllegalStateException`, mientras que la salida capturada SÍ contiene `IllegalStateException` en nivel ERROR (FR-018). Validar al menos un cuerpo contra `contracts/problem-details.schema.json` (comprobando campos con AssertJ si no se añade un validador JSON Schema: no añadir dependencias).
 - [X] T043 [US4] Crear `src/test/java/com/mangateca/api/platform/web/ErrorDispatchIT.java`, que cubre los errores **fuera de MVC** (FR-015: "Toda respuesta de error"). `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@AutoConfigureRestTestClient`, imports estándar y una `@TestConfiguration` anidada que registra un `FilterRegistrationBean` con un `OncePerRequestFilter` **solo de test**, mapeado a `/api/v1/probes/filter-failure` y ordenado después de la cadena de seguridad, que lanza `new IllegalStateException("fallo interno en filtro SELECT secreto")`. Casos: (1) esa ruta con un token válido → 500 con `Content-Type: application/problem+json`, `type` `about:blank`, `title` `Internal Server Error`, `instance` = la ruta original (no `/error`) y sin información interna (sin `fallo interno`, `SELECT`, `IllegalStateException`, `timestamp`, `trace` ni `path`); (2) `GET /error` directo con un token válido (sin atributos de error) → 500 Problem Details (`title` `Internal Server Error`), nunca el JSON de `BasicErrorController`. Debe fallar antes de T046.
-- [X] T044 [P] [US4] Crear `src/test/java/com/mangateca/api/platform/web/ProblemDetailsErrorControllerTests.java`, el slice que exige la constitución (§VI: "Los controladores … MUST probarse con `@WebMvcTest`"). `@WebMvcTest(ProblemDetailsErrorController.class)` + MockMvc + `@ExtendWith(OutputCaptureExtension.class)`. Autenticación simulada con `SecurityMockMvcRequestPostProcessors.jwt()` (el slice no depende de `SecurityConfiguration`). Invocar `GET /error` con `requestAttr` para estos casos: (1) `jakarta.servlet.error.status_code` = `404` y `jakarta.servlet.error.request_uri` = `/api/v1/x` → 404 Problem Details con `instance` `/api/v1/x`; (2) `status_code` = `500`, `request_uri` = `/api/v1/y`, `jakarta.servlet.error.exception` = `new IllegalStateException("secreto SELECT")` y `jakarta.servlet.error.message` = `"secreto"` → 500 Problem Details sin `secreto`, `SELECT` ni `IllegalStateException` en el cuerpo, mientras que la salida capturada SÍ contiene `IllegalStateException` en ERROR (FR-018); (3) sin atributos → 500 con `instance` `/error`; (4) `status_code` = `200` (no es error) → 500. En todos: `Content-Type: application/problem+json`, `type` `about:blank` y `title` estándar. Debe fallar antes de T046.
+- [X] T044 [P] [US4] Crear `src/test/java/com/mangateca/api/platform/web/ProblemDetailsErrorControllerTests.java`, slice del controlador de error. `@WebMvcTest(ProblemDetailsErrorController.class)` + MockMvc + `@ExtendWith(OutputCaptureExtension.class)`. Autenticación simulada con `SecurityMockMvcRequestPostProcessors.jwt()` (el slice no depende de `SecurityConfiguration`). Invocar `GET /error` con `requestAttr` para estos casos: (1) `jakarta.servlet.error.status_code` = `404` y `jakarta.servlet.error.request_uri` = `/api/v1/x` → 404 Problem Details con `instance` `/api/v1/x`; (2) `status_code` = `500`, `request_uri` = `/api/v1/y`, `jakarta.servlet.error.exception` = `new IllegalStateException("secreto SELECT")` y `jakarta.servlet.error.message` = `"secreto"` → 500 Problem Details sin `secreto`, `SELECT` ni `IllegalStateException` en el cuerpo, mientras que la salida capturada SÍ contiene `IllegalStateException` en ERROR (FR-018); (3) sin atributos → 500 con `instance` `/error`; (4) `status_code` = `200` (no es error) → 500. En todos: `Content-Type: application/problem+json`, `type` `about:blank` y `title` estándar. Debe fallar antes de T046. **Retirado (2026-11-05)**: archivo eliminado por duplicar `ErrorDispatchIT` (T043); con la constitución v2.0.0 el slice ya no es obligatorio.
 
 ### Implementation for User Story 4
 
@@ -240,12 +241,12 @@ falla; retirarlo y comprobar que pasa.
 
 ### Tests for User Story 6 ⚠️
 
-- [ ] T049 [P] [US6] Crear `src/test/java/com/mangateca/api/ModularityTests.java` (sin contexto Spring): `ApplicationModules modules = ApplicationModules.of(ApiApplication.class)`; test `verifiesModularStructure()` → `modules.verify()`; test que comprueba que existe el módulo `platform` (`modules.getModuleByName("platform")` presente); test `writesDocumentation()` → `new Documenter(modules).writeModulesAsPlantUml().writeIndividualModulesAsPlantUml()` (salida en `target/spring-modulith-docs`, no versionada).
-- [ ] T050 [P] [US6] Crear `src/test/java/com/mangateca/api/platform/PlatformModuleTests.java`: `@ApplicationModuleTest` + `@Import({TestcontainersConfiguration.class, TestSecurityConfiguration.class})`. Verifica que el módulo `platform` arranca aislado y que su contexto contiene `SecurityConfiguration`, `GlobalExceptionHandler`, `ProblemDetailsErrorController`, `ProblemDetailsResponseWriter` y `CorsProperties`. Depende de US3 y US4.
+- [X] T049 [P] [US6] Crear `src/test/java/com/mangateca/api/ModularityTests.java` (sin contexto Spring): `ApplicationModules.of(ApiApplication.class)`; test `verifiesModularStructure()` → `modules.verify()`; test que comprueba que existe el módulo `platform`. Sin `Documenter` (YAGNI). **Nota (2026-11-05)**: se descartaron los fixtures de violación/ciclo en `src/test`, porque `ApplicationModules.of` no importa clases de test (`No classes found in packages`); SC-002 se demuestra con T051.
+- ~~T050 [P] [US6] `PlatformModuleTests` con `@ApplicationModuleTest`.~~ **Retirada (2026-11-05)**: opcional según la constitución v2.0.0; el arranque del contexto ya lo cubre `ApiApplicationTests`.
 
 ### Implementation for User Story 6
 
-- [ ] T051 [US6] ⚠️ TEMPORAL, NO COMMITEAR. Ejecutar quickstart §4a: crear `src/main/java/com/mangateca/api/demo/Demo.java` que use `com.mangateca.api.platform.security.CorsProperties`, y `./mvnw verify` → `ModularityTests` falla indicando el módulo origen `demo`, el destino `platform` y el tipo accedido. Revertir. Luego crear los paquetes temporales `com.mangateca.api.demoa` y `com.mangateca.api.demob`, con una clase pública cada uno que dependa de la del otro, y `./mvnw verify` → falla identificando el ciclo `demoa` ↔ `demob` (US6-3). Revertir con `git checkout -- . && git clean -fd` y confirmar que `./mvnw verify` vuelve a pasar. Si algún caso no falla, corregir T013/T049.
+- [ ] T051 [US6] ⚠️ TEMPORAL, NO COMMITEAR. Ejecutar quickstart §4a: crear `src/main/java/com/mangateca/api/demo/Demo.java` que use `com.mangateca.api.platform.security.CorsProperties`, y `./mvnw verify` → `ModularityTests` falla indicando el módulo origen `demo`, el destino `platform` y el tipo accedido. Revertir con `git checkout -- . && git clean -fd` y confirmar que `./mvnw verify` vuelve a pasar. (El caso del ciclo se omite: no es vital.)
 
 **Checkpoint**: US6 verificada.
 
@@ -253,16 +254,15 @@ falla; retirarlo y comprobar que pasa.
 
 ## Phase 9: User Story 7 - Puerta de calidad (Priority: P2)
 
-**Goal**: el build falla si la cobertura de líneas de dominio y aplicación baja del 80% o si
-hay cualquier advertencia de compilación (FR-013, FR-014, SC-002).
+**Goal**: el build falla si hay cualquier advertencia de compilación (FR-014, SC-002). Sin umbral
+de cobertura (FR-013 retirado, constitución v2.0.0).
 
-**Independent Test**: introducir código sin tests en un paquete `domain` y una advertencia de
-compilación; el build falla en ambos casos.
+**Independent Test**: introducir una advertencia de compilación; el build falla.
 
 ### Implementation for User Story 7
 
-- [ ] T052 [US7] Modificar `pom.xml`: añadir `org.jacoco:jacoco-maven-plugin` con la versión en la propiedad `jacoco.version` = `0.8.16` y las ejecuciones `prepare-agent` (por defecto), `report` (fase `verify`) y `check` (fase `verify`). Configuración del `check`: `<includes>` `com/mangateca/api/**/domain/**` y `com/mangateca/api/**/application/**`; regla `<element>BUNDLE</element>` con el límite `<counter>LINE</counter>`, `<value>COVEREDRATIO</value>`, `<minimum>0.80</minimum>`. Si el Boot parent configura `argLine` en Surefire, conservarlo o encadenarlo con `@{argLine}`. Ejecutar `./mvnw verify`: debe pasar con el conjunto vacío (research R14). Anotar en T061 si JaCoCo informa de "0 classes" o se salta la regla.
-- [ ] T053 [US7] ⚠️ TEMPORAL, NO COMMITEAR. Ejecutar quickstart §4b: crear `src/main/java/com/mangateca/api/demo/domain/Untested.java` con un método con lógica (p. ej. un `if` y un bucle) sin tests, y `./mvnw verify` → falla `jacoco:check` con un mensaje que muestra el ratio obtenido y el mínimo `0.80` (US7-1). Revertir. Ejecutar quickstart §4c: añadir en una clase de `src/main` un raw type (`List l = new ArrayList();`) y `./mvnw compile` → falla mostrando la advertencia y `warnings found and -Werror specified` (US7-2). Revertir con `git checkout -- . && git clean -fd` y confirmar que `./mvnw verify` pasa. Si un caso no falla, corregir T010/T052.
+- ~~T052 [US7] Añadir `jacoco-maven-plugin` 0.8.16 con regla `LINE COVEREDRATIO` ≥ 0.80.~~ **Retirada (2026-11-05)**: la constitución v2.0.0 elimina el umbral de cobertura obligatorio. No se añade JaCoCo.
+- [ ] T053 [US7] ⚠️ TEMPORAL, NO COMMITEAR. Ejecutar quickstart §4c: añadir en una clase de `src/main` un raw type (`List l = new ArrayList();`) y `./mvnw compile` → falla mostrando la advertencia y `warnings found and -Werror specified` (US7-1). Revertir con `git checkout -- . && git clean -fd` y confirmar que `./mvnw verify` pasa. Si no falla, corregir T010. (La parte de cobertura §4b se retiró el 2026-11-05.)
 
 **Checkpoint**: US7 verificada.
 
@@ -278,16 +278,16 @@ contrato y verificar su contenido.
 
 ### Tests for User Story 8 ⚠️ (escribir primero; deben fallar)
 
-- [ ] T054 [P] [US8] Crear `src/test/java/com/mangateca/api/actuator/HealthEndpointIT.java` (`@SpringBootTest(webEnvironment = RANDOM_PORT)`, imports estándar). `GET /actuator/health` sin token → 200, `status` `UP`, `components.db.status` `UP`; ningún componente incluye la clave `details`; el cuerpo no contiene `PostgreSQL`, `jdbc:`, `localhost` ni el número de versión del servidor (supuesto de la spec: solo estado).
-- [ ] T055 [P] [US8] Crear `src/test/java/com/mangateca/api/actuator/InfoEndpointIT.java` (`@SpringBootTest(webEnvironment = RANDOM_PORT)`, imports estándar). `GET /actuator/info` sin token → 200 con `build.name` y `build.version` presentes, y sin las claves `java`, `os`, `env` ni `git` (supuesto de la spec: solo nombre y versión). Requiere el `build-info` de T059, que genera `./mvnw verify`.
-- [ ] T056 [P] [US8] Crear `src/test/java/com/mangateca/api/actuator/HealthDatabaseDownIT.java`: `@SpringBootTest(webEnvironment = RANDOM_PORT)` con una `@TestConfiguration` anidada que declara su **propio** `@ServiceConnection PostgreSQLContainer` `postgres:18` (no importa `TestcontainersConfiguration`, sí `TestSecurityConfiguration`), con la propiedad `spring.datasource.hikari.connection-timeout=2000` y `@DirtiesContext`. El test detiene el contenedor (`container.stop()`) y comprueba que `GET /actuator/health` → 503 con `status` `DOWN` y `components.db.status` `DOWN` (US8-2).
-- [ ] T057 [P] [US8] Crear `src/test/java/com/mangateca/api/openapi/OpenApiDocsIT.java` (`@SpringBootTest(webEnvironment = RANDOM_PORT)`, imports estándar). Sin token: `GET /v3/api-docs` → 200 JSON con `openapi` que empieza por `3.` y `components.securitySchemes.bearerAuth` con `type` `http`, `scheme` `bearer` y `bearerFormat` `JWT`, y `paths` sin la clave `/error` (T046, `@Hidden`). No hacer más aserciones sobre `paths`: en el classpath de test también está el `ProbeController`; `GET /swagger-ui.html` → 200 o 302, y siguiendo la redirección, el HTML de la interfaz (200, `text/html`).
+- [ ] T054 [US8] Crear `src/test/java/com/mangateca/api/actuator/ActuatorAndDocsIT.java` (`@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@AutoConfigureRestTestClient`, imports estándar), un solo IT con tres tests y aserciones mínimas, todos sin token: (1) `GET /actuator/health` → 200, `status` `UP`, `components.db.status` `UP` y ningún componente con la clave `details`; (2) `GET /actuator/info` → 200 con `build.name` y `build.version`, y sin las claves `java`, `os` ni `env` (requiere el `build-info` de T059); (3) `GET /v3/api-docs` → 200 con `openapi` que empieza por `3.`, `components.securitySchemes.bearerAuth` (`http`/`bearer`/`JWT`) y `paths` sin `/error`. Fusiona las antiguas T054, T055 y T057.
+- ~~T055 [P] [US8] `InfoEndpointIT`.~~ **Fusionada en T054 (2026-11-05).**
+- ~~T056 [P] [US8] `HealthDatabaseDownIT` con contenedor propio detenido → 503.~~ **Retirada (2026-11-05)**: test caro y no vital; US8-2 se valida a mano con quickstart §4(g) en T065.
+- ~~T057 [P] [US8] `OpenApiDocsIT`.~~ **Fusionada en T054 (2026-11-05).**
 
 ### Implementation for User Story 8
 
 - [ ] T058 [US8] Modificar `src/main/resources/application.yaml` añadiendo `management.endpoint.health.show-details: never`, `management.endpoint.health.show-components: always` y la desactivación de las contribuciones de info `env`, `java`, `os` y `git` (`management.info.<x>.enabled: false`; comprobar los nombres de las propiedades en Boot 4.1 con Context7). `management.endpoints.web.exposure.include: health,info` ya está desde T016.
 - [ ] T059 [US8] Modificar `pom.xml`: añadir al `spring-boot-maven-plugin` la ejecución con el goal `build-info` (genera `META-INF/build-info.properties` con nombre y versión, research R12), conservando la configuración de perfiles de T024.
-- [ ] T060 [P] [US8] Crear `src/main/java/com/mangateca/api/platform/web/OpenApiConfiguration.java` (`@Configuration(proxyBeanMethods = false)`): bean `OpenAPI` (springdoc 3.2.0) con `info` (título `Mangateca API`, versión de la app) y `components.securitySchemes.bearerAuth` = `SecurityScheme` `type HTTP`, `scheme "bearer"`, `bearerFormat "JWT"`, más un `SecurityRequirement` global `bearerAuth`. Ejecutar `./mvnw verify`: T054–T057 pasan.
+- [ ] T060 [P] [US8] Crear `src/main/java/com/mangateca/api/platform/web/OpenApiConfiguration.java` (`@Configuration(proxyBeanMethods = false)`): bean `OpenAPI` (springdoc 3.2.0) con `info` (título `Mangateca API`, versión de la app) y `components.securitySchemes.bearerAuth` = `SecurityScheme` `type HTTP`, `scheme "bearer"`, `bearerFormat "JWT"`, más un `SecurityRequirement` global `bearerAuth`. Ejecutar `./mvnw verify`: T054 pasa.
 
 **Checkpoint**: US8 verificada.
 
@@ -303,7 +303,7 @@ secciones obligatorias.
 
 ### Implementation for User Story 9
 
-- [ ] T061 [US9] Actualizar `docs/adr/ADR-002-mapstruct.md` y `docs/adr/ADR-005-quality-gate.md` con los resultados reales: compatibilidad verificada de MapStruct 1.6.3 con `--release 25` (T010); resultado de `-Xlint:processing` (sin advertencias, o la enmienda `-Xlint:all,-processing` justificada); comportamiento observado de `jacoco:check` con el conjunto vacío (T052) y los mensajes de fallo obtenidos en T053. Si algún ADR cambió de decisión, actualizar su sección "Decisión" y "Consecuencias".
+- [ ] T061 [US9] Actualizar `docs/adr/ADR-002-mapstruct.md` y `docs/adr/ADR-005-quality-gate.md` con los resultados reales: compatibilidad verificada de MapStruct 1.6.3 con `--release 25` (T010) y el mensaje de fallo de `-Xlint` obtenido en T053. Si algún ADR cambió de decisión, actualizar "Decisión" y "Consecuencias". (ADR-005 ya registra la retirada de JaCoCo, 2026-11-05.)
 - [ ] T062 [US9] Revisar `docs/adr/ADR-001-spring-modulith.md` … `docs/adr/ADR-005-quality-gate.md` contra la lista de data-model.md §ADR: nombre `ADR-NNN-<slug>.md`, `Estado` `Aceptado`, fecha ISO, y las 7 secciones (Título/Estado/Fecha, Contexto y problema, Alternativas con la opción nativa, Decisión con artefacto y versión exactos que coinciden con `pom.xml`, Compatibilidad Java 25 / Spring Boot 4.1.x, Mantenimiento con última release, cadencia y licencia, Consecuencias). Corregir lo que falte.
 
 **Checkpoint**: US9 verificada (SC-007).
@@ -314,9 +314,9 @@ secciones obligatorias.
 
 **Purpose**: documentación final, higiene y validación de punta a punta.
 
-- [ ] T063 Completar `README.md`: sección "Configuración por entorno" con la tabla de variables obligatorias y opcionales de `contracts/configuration.md` (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION`, `MANGATECA_CORS_ALLOWED_ORIGINS`) y qué ocurre si faltan; sección "Pruebas" (`./mvnw verify`, requiere Docker, informe en `target/site/jacoco/index.html`); enlace a `docs/adr/`.
+- [ ] T063 Completar `README.md`: sección "Configuración por entorno" con la tabla de variables obligatorias y opcionales de `contracts/configuration.md` (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION`, `MANGATECA_CORS_ALLOWED_ORIGINS`) y qué ocurre si faltan; sección "Pruebas" (`./mvnw verify`, requiere Docker; solo tests vitales, sin umbral de cobertura); enlace a `docs/adr/`.
 - [ ] T064 [P] Revisión de secretos y configuración (FR-023): buscar en el repositorio (`git grep -nE "BEGIN (RSA |)PRIVATE KEY|BEGIN PUBLIC KEY|password:|secret"`) y confirmar que no hay claves ni contraseñas versionadas; asegurar que `.gitignore` incluye `.env`, `*.pem` y `*.key`. Confirmar que ningún log de producción registra tokens, contraseñas ni PII.
-- [ ] T065 Validación de punta a punta según `specs/001-platform-foundation/quickstart.md` §1, §2, §3 y §5, y las filas (d), (e) y (f) de §4 (⚠️ los cambios de §4 son TEMPORALES: revertirlos y limpiar con `docker compose down -v`). Registrar cualquier discrepancia y corregirla en la tarea correspondiente, o actualizar quickstart.md si la guía estaba mal.
+- [ ] T065 Validación de punta a punta según `specs/001-platform-foundation/quickstart.md` §1, §2, §3 y §5, y las filas (c), (d), (e), (f) y (g) de §4 (⚠️ los cambios de §4 son TEMPORALES: revertirlos y limpiar con `docker compose down -v`). Registrar cualquier discrepancia y corregirla en la tarea correspondiente, o actualizar quickstart.md si la guía estaba mal.
 - [ ] T066 Revisión con el agente `spec-reviewer` del código frente a `spec.md`, `plan.md` y `.specify/memory/constitution.md` (FR-001…FR-026, SC-001…SC-007). Corregir los hallazgos y volver a ejecutar `./mvnw verify`.
 - [ ] T067 Actualizar `specs/001-platform-foundation/plan.md` (*Riesgos* y *Complexity Tracking*) y, si cambió el DDL o alguna propiedad, `data-model.md` y `contracts/configuration.md`, para que reflejen las desviaciones reales encontradas (p. ej. la forma YAML de `ignore-migration-patterns`, la exclusión `-processing` o el comportamiento del entry point 401).
 
@@ -330,17 +330,17 @@ secciones obligatorias.
   secuencia (mismo `pom.xml`, cada uno después de su ADR).
 - **Foundational (Phase 2)**: depende de T011. **Bloquea** todas las historias.
 - **US1, US2, US3, US5, US7**: solo dependen de Foundational.
-- **US4**: T042, T044 (slices), T045 y T046 solo dependen de Foundational; T043 (error dispatch real)
+- **US4**: T042 (slice), T045 y T046 solo dependen de Foundational; T043 (error dispatch real)
   depende de T039 (US3), por el `permitAll` del error dispatch y los tokens reales.
-- **US6**: T049 solo depende de Foundational; T050 depende de US3 y US4 (verifica sus beans).
+- **US6**: T049 solo depende de Foundational.
 - **US8**: depende de US3 (los tests asumen el `SecurityFilterChain` con las rutas públicas; sin
   él, la seguridad por defecto de Boot devuelve 401).
-- **US9**: depende de T010, T052 y T053 (registra sus resultados).
+- **US9**: depende de T010 y T053 (registra sus resultados).
 - **Polish (Phase 12)**: depende de todas las historias.
 
 ### Archivos compartidos (no paralelizar entre historias)
 
-- `pom.xml`: T006–T011, T024, T052 y T059.
+- `pom.xml`: T006–T011, T024 y T059.
 - `GlobalExceptionHandler.java`: T045 y T046 (este último extrae los textos de `detail`).
 - `src/main/resources/application.yaml`: T016, T029 y T058.
 - `src/main/resources/application-dev.yaml`: T023 y T041.
@@ -352,9 +352,9 @@ secciones obligatorias.
 Setup ─► Foundational ─┬─► US1 (P1) 🎯 MVP
                        ├─► US2 (P1)
                        ├─► US3 (P1) ─┬─► US8 (P2)
-                       │             ├─► US4: T043 (error dispatch real, tokens reales)
-                       │             └─► US6 (P2, T050)
-                       ├─► US4 (P1) ───► US6 (P2, T050)
+                       │             └─► US4: T043 (error dispatch real, tokens reales)
+                       ├─► US4 (P1)
+                       ├─► US6 (P2)
                        ├─► US5 (P2)
                        ├─► US7 (P2) ───► US9 (P3)
                        └──────────────────► Polish
@@ -362,7 +362,7 @@ Setup ─► Foundational ─┬─► US1 (P1) 🎯 MVP
 
 ### Within Each User Story
 
-- Tests primero, y deben fallar antes de implementar.
+- Tests vitales primero (recomendado, no obligatorio).
 - Records y escritores compartidos → handlers → configuración (`SecurityConfiguration`).
 - Configuración YAML/pom de la historia al final, para cerrar los tests.
 - Commit al terminar cada tarea (salvo las ⚠️ TEMPORALES).
@@ -373,10 +373,8 @@ Setup ─► Foundational ─┬─► US1 (P1) 🎯 MVP
 - Phase 2: T012–T015, T017, T018, T019 y T021.
 - Con Foundational terminado: US1, US2, US3, US4, US5 y US7 pueden avanzar en paralelo,
   respetando los archivos compartidos.
-- Dentro de US3: T030, T031, T032 y T033 (tests); T034 y T035; T036, T037 y T038 tras T035; T040.
-- Dentro de US4: T042 y T044 (slices, archivos distintos).
-- Dentro de US8: T054–T057 (tests) y T060.
-- US6: T049 y T050.
+- Dentro de US3: T030, T031 y T032 (tests); T034 y T035; T036, T037 y T038 tras T035; T040.
+- Dentro de US8: T054 (test) y T060.
 
 ---
 
@@ -387,7 +385,6 @@ Setup ─► Foundational ─┬─► US1 (P1) 🎯 MVP
 Task: "CorsPropertiesTests en src/test/java/com/mangateca/api/platform/security/CorsPropertiesTests.java"
 Task: "SecurityIT en src/test/java/com/mangateca/api/platform/security/SecurityIT.java"
 Task: "CorsIT en src/test/java/com/mangateca/api/platform/security/CorsIT.java"
-Task: "ProbeSecurityWebMvcTests en src/test/java/com/mangateca/api/platform/security/ProbeSecurityWebMvcTests.java"
 
 # Piezas base en paralelo:
 Task: "CorsProperties en src/main/java/com/mangateca/api/platform/security/CorsProperties.java"
@@ -403,10 +400,7 @@ Task: "ProblemDetailsCorsProcessor"
 ## Parallel Example: User Story 8
 
 ```bash
-Task: "HealthEndpointIT en src/test/java/com/mangateca/api/actuator/HealthEndpointIT.java"
-Task: "InfoEndpointIT en src/test/java/com/mangateca/api/actuator/InfoEndpointIT.java"
-Task: "HealthDatabaseDownIT en src/test/java/com/mangateca/api/actuator/HealthDatabaseDownIT.java"
-Task: "OpenApiDocsIT en src/test/java/com/mangateca/api/openapi/OpenApiDocsIT.java"
+Task: "ActuatorAndDocsIT en src/test/java/com/mangateca/api/actuator/ActuatorAndDocsIT.java"
 Task: "OpenApiConfiguration en src/main/java/com/mangateca/api/platform/web/OpenApiConfiguration.java"
 ```
 
@@ -427,7 +421,7 @@ Task: "OpenApiConfiguration en src/main/java/com/mangateca/api/platform/web/Open
 2. US1 → arranque local (MVP).
 3. US2 → esquema blindado (SC-006).
 4. US3 + US4 → seguridad y errores (SC-003, SC-004). Con esto el bloque P1 está completo.
-5. US5, US6 y US7 → gobierno automático (SC-002, SC-005).
+5. US5, US6 y US7 → gobierno automático (SC-002, SC-005), sin umbral de cobertura.
 6. US8 → observabilidad y contrato.
 7. US9 → ADR actualizados con lo verificado (SC-007).
 8. Polish → quickstart completo y revisión con `spec-reviewer`.
@@ -435,8 +429,8 @@ Task: "OpenApiConfiguration en src/main/java/com/mangateca/api/platform/web/Open
 ### Agentes sugeridos en `/speckit-implement`
 
 - `spring-dev`: tareas de producción, configuración y `pom.xml`.
-- `spring-test`: tareas de tests (T018–T021, T027, T028, T030, T031, T032, T033, T042, T043, T044,
-  T047, T049, T050, T054, T055, T056 y T057) y fallos de build por tests o cobertura.
+- `spring-test`: tareas de tests (T018–T021, T027, T028, T030, T031, T032, T042, T043, T047, T049
+  y T054) y fallos de build por tests.
 - `spec-reviewer`: al cerrar cada fase y en T066.
 
 ---
@@ -445,6 +439,6 @@ Task: "OpenApiConfiguration en src/main/java/com/mangateca/api/platform/web/Open
 
 - [P] = archivos distintos y sin dependencias pendientes.
 - [USx] da trazabilidad de cada tarea a su historia de usuario en spec.md.
-- Las tareas ⚠️ TEMPORAL demuestran SC-002/SC-006 y **nunca** se commitean.
+- Las tareas ⚠️ TEMPORAL demuestran SC-002 y **nunca** se commitean.
 - Si una tarea descubre que un documento de diseño estaba equivocado, se corrige el documento
   (T067), no se reinterpreta la constitución.
