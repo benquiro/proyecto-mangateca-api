@@ -5,6 +5,8 @@ import java.io.IOException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import com.mangateca.api.platform.web.GlobalExceptionHandler;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -26,7 +28,7 @@ public class ProblemDetailsAccessDeniedHandler implements AccessDeniedHandler {
 	public void handle(HttpServletRequest request, HttpServletResponse response,
 			AccessDeniedException accessDeniedException) throws IOException {
 		this.writer.write(request, response, HttpStatus.FORBIDDEN,
-				"No tiene permisos para acceder a este recurso.");
+				GlobalExceptionHandler.detailFor(HttpStatus.FORBIDDEN));
 	}
 
 }

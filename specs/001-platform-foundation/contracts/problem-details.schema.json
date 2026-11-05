@@ -18,8 +18,9 @@
     },
     "status": {
       "type": "integer",
-      "description": "Solo códigos que se responden en Problem Details. El 503 del health DOWN usa el formato propio de Actuator y no está incluido.",
-      "enum": [400, 401, 403, 404, 405, 415, 500]
+      "description": "Cualquier código 4xx o 5xx respondido en Problem Details (incluye otros 4xx/5xx del framework, p. ej. 406, 413 o 503). El 503 del health DOWN usa el formato propio de Actuator y no se rige por este esquema.",
+      "minimum": 400,
+      "maximum": 599
     },
     "detail": {
       "type": "string",

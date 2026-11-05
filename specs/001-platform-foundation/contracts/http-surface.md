@@ -42,6 +42,11 @@ Las rutas públicas aceptan la petición sin token. No exigen que el token esté
 | Método no soportado                        | 405    | `"Método no soportado para este recurso."`      | `Allow`  |
 | Content-Type no soportado                  | 415    | `"Tipo de contenido no soportado."`             | —        |
 | Fallo inesperado                           | 500    | `"Se produjo un error interno."`                | log ERROR en servidor |
+| Otros 4xx/5xx del framework (406, 413, 503, `sendError` del contenedor…) | 4xx / 5xx | 4xx: `"La petición no es válida."`; 5xx: `"Se produjo un error interno."` | 5xx: log ERROR en servidor |
+
+> Nota (2026-11-05): la fila "Otros 4xx/5xx del framework" y el rango `400-599` de `status` en
+> `problem-details.schema.json` son una ampliación del contrato tras la revisión de la Fase 6.
+> Antes el esquema solo admitía 400, 401, 403, 404, 405, 415 y 500.
 
 Los textos exactos de `detail` los fija la implementación. Los tests MUST verificar `status`,
 `title`, el `Content-Type` y la ausencia de información interna, no el texto literal.

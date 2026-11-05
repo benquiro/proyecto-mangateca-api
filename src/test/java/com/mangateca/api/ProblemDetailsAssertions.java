@@ -31,11 +31,24 @@ public final class ProblemDetailsAssertions {
 	public static void assertProblemDetails(EntityExchangeResult<String> result, int expectedStatus,
 			String expectedInstance) {
 		assertThat(result.getStatus().value()).isEqualTo(expectedStatus);
-		MediaType contentType = result.getResponseHeaders().getContentType();
+		assertProblemDetails(expectedStatus, result.getResponseHeaders().getContentType(),
+				result.getResponseBody(), expectedInstance);
+	}
+
+	/**
+	 * Variante para MockMvc/MockMvcTester: trabaja sobre (status, contentType, body). El
+	 * status real de la respuesta debe comprobarse aparte; aqui se valida el campo
+	 * {@code status} del cuerpo.
+	 * @param expectedStatus codigo HTTP esperado
+	 * @param contentType cabecera Content-Type de la respuesta (puede ser null)
+	 * @param body cuerpo crudo
+	 * @param expectedInstance ruta de la peticion, sin query
+	 */
+	public static void assertProblemDetails(int expectedStatus, MediaType contentType, String body,
+			String expectedInstance) {
 		assertThat(contentType).isNotNull();
 		assertThat(contentType.isCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)).isTrue();
 
-		String body = result.getResponseBody();
 		assertThat(body).isNotNull().isNotBlank();
 		JsonNode json = MAPPER.readTree(body);
 		assertThat(json.path("type").asString()).isEqualTo("about:blank");
@@ -44,6 +57,8 @@ public final class ProblemDetailsAssertions {
 		assertThat(json.path("status").asInt()).isEqualTo(expectedStatus);
 		assertThat(json.path("detail").asString()).isNotBlank();
 		assertThat(json.path("instance").asString()).isEqualTo(expectedInstance);
+		assertThat(json.has("timestamp")).isFalse();
+		assertThat(json.has("path")).isFalse();
 
 		assertNoInternalInfo(body);
 	}

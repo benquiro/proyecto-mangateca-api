@@ -7,7 +7,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,6 +43,16 @@ public class ProbeController {
 	@PreAuthorize("hasRole('ADMIN')")
 	public String admin() {
 		return "admin";
+	}
+
+	@GetMapping(value = "/json-only", produces = MediaType.APPLICATION_JSON_VALUE)
+	public ProbeRequest jsonOnly() {
+		return new ProbeRequest("probe", 1);
+	}
+
+	@GetMapping("/status-failure")
+	public String statusFailure() {
+		throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "razon interna SELECT");
 	}
 
 	@GetMapping("/failure")
