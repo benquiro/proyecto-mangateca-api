@@ -24,19 +24,6 @@ HELP.md
 .fseventsd
 .VolumeIcon.icns
 
-### AI Agents & Spec-Driven Tooling ###
-# Claude Code / Anthropic
-.claude/
-.claude.json
-CLAUDE.local.md
-
-# Spec-kit & Agent Scratchpads / Caches
-.spec-kit/
-.speckit/
-.specs-cache/
-*.agent.log
-*.prompt.tmp
-
 # Antigravity CLI & Other Agent Tooling
 .agy/
 .aider*
