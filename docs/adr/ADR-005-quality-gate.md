@@ -46,3 +46,4 @@ Si una advertencia procede de una librería o procesador de anotaciones de terce
   - **Enmienda 2026-11-05**: se sustituye `-Xlint:all` por `-Xlint:all,-processing` en `default-compile` y `default-testCompile`. El Estado sigue en Aceptado.
   - Compatibilidad de MapStruct con `--release 25` (T010): la compilación no falló, pero aún no existen mappers, así que no está demostrada con uso real.
 - **Enmienda 2026-11-05 (constitución v2.0.0)**: se retira JaCoCo y el umbral de cobertura del 80% (FR-013 retirado). La puerta de calidad queda solo en compilación sin advertencias. La exclusión `-processing` está permitida de forma explícita por la constitución v3.0.0 (§VI). El Estado sigue en Aceptado.
+- **Verificado (T068, 2026-11-05)**: dos módulos temporales `demoa` y `demob` que se referencian mutuamente hicieron fallar `ModularityTests` con `Cycle detected: Slice demoa -> Slice demob -> Slice demoa` (US6/AC3, SC-002). Los módulos se eliminaron y no se commitearon.
