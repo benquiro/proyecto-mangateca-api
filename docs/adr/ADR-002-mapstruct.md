@@ -32,7 +32,10 @@ MapStruct. Las versiones se declaran en propiedades de `pom.xml`: `mapstruct.ver
 ## Compatibilidad
 
 - **Java 25**: MapStruct 1.6.3 se publicó antes de Java 25, por lo que su compatibilidad con
-  `--release 25` no está documentada por el proyecto y se verifica empíricamente en T010.
+  `--release 25` no está documentada por el proyecto. Verificada en T010 (2026-11-05): con el
+  procesador configurado, `./mvnw clean test-compile` y `./mvnw verify` compilan sin errores ni
+  advertencias. Aún no existe ningún mapper, así que la compatibilidad con uso real
+  (generación de implementaciones) queda por demostrar cuando aparezca el primer DTO.
 - **Spring Boot 4.1.x**: MapStruct es un procesador de anotaciones independiente del framework;
   no depende de Spring Boot.
 - `lombok-mapstruct-binding` es necesario para que Lombok y MapStruct convivan en la misma
@@ -58,5 +61,6 @@ Verificado en Maven Central el 2026-11-05:
 - Los errores de mapeo se detectan en compilación, junto con `-Xlint:all,-processing` y
   `failOnWarning` (ver ADR-005).
 - Se añade un procesador más a la compilación, con orden de procesadores obligatorio.
-- **Riesgo**: compatibilidad de MapStruct 1.6.3 con `--release 25`. Se verifica en T010 con la
-  build con `failOnWarning` (ver ADR-005); si falla, se reabre este ADR.
+- **Riesgo residual**: la compilación con `--release 25` y `failOnWarning` pasó en T010 (ver
+  ADR-005), pero sin mappers reales. Si el primer mapper falla con `--release 25`, se reabre
+  este ADR.

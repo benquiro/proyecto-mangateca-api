@@ -35,6 +35,9 @@ Si una advertencia procede de una librería o procesador de anotaciones de terce
 ## Consecuencias
 
 - Cualquier advertencia de compilación, incluida la de código de test, rompe el build.
+- **Verificado (T053, 2026-11-05)**: un raw type (`List l = new ArrayList();`) en una clase de
+  `src/main` hace fallar `./mvnw compile` con `found raw type: java.util.List` y
+  `warnings found and -Werror specified`. El cambio se revirtió y el build vuelve a pasar.
 - **Riesgo: `-Xlint:processing` (materializado en T010)**. Con `-Xlint:all` javac emite en ambas ejecuciones, con `--release 25`:
   - `default-compile`: `No processor claimed any of these annotations: /org.springframework.boot.autoconfigure.SpringBootApplication`
   - `default-testCompile`: `No processor claimed any of these annotations: /org.springframework.boot.test.context.TestConfiguration,/org.springframework.context.annotation.Bean,/org.junit.jupiter.api.Test,/org.springframework.context.annotation.Import,/org.springframework.boot.testcontainers.service.connection.ServiceConnection,/org.springframework.boot.test.context.SpringBootTest`
