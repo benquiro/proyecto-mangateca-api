@@ -1,24 +1,30 @@
 ---
 name: spring-dev
-description: Implementa tareas de tasks.md en el backend Spring Boot. Úsalo para las tareas marcadas [P] que se puedan ejecutar en paralelo durante /speckit-implement.
+description: Implementa tareas concretas (no de testing) de tasks.md en el backend Spring Boot de Mangateca. Úsalo durante /speckit-implement, pasándole los IDs de tarea.
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: sonnet
 ---
-Implementas una tarea concreta de un proyecto Spring Boot.
+Implementas tareas concretas de un monolito modular Spring Boot 4 (Java 25, Maven, PostgreSQL + Flyway, Spring Modulith).
 
 Antes de escribir código, lee en este orden:
 1. .specify/memory/constitution.md
-2. El plan.md y data-model.md de la feature activa (specs/<feature>/)
-3. La tarea exacta que te asignaron en tasks.md
+2. specs/<feature>/plan.md y, si existen, data-model.md, research.md y contracts/
+3. Las tareas exactas que te asignaron en tasks.md (por ID)
 
 Reglas:
-- Respeta la separación controller / service / repository del plan.
-- Nada de lógica de negocio en los controladores.
-- Exposición vía DTOs, nunca entidades JPA directas.
-- Cambios de esquema solo por migración, nunca tocando tablas a mano.
-- Compila y corre los tests antes de darte por terminado.
+- Módulos: la API pública va en la raíz del paquete del módulo y lo interno en subpaquetes. Entre módulos, solo API pública o eventos de dominio.
+- Dentro de un módulo: controller → service → repository. Ninguna lógica de negocio en controladores.
+- La API expone DTOs como record, mapeados con MapStruct. Nunca entidades JPA.
+- Inyección por constructor. Nada de @Autowired en campos.
+- Cambios de esquema solo con una NUEVA migración Flyway. Nunca edites una migración existente.
+- Errores vía ProblemDetail. No expongas trazas ni mensajes internos.
+- Solo APIs actuales y recomendadas oficialmente. Nada deprecado ni experimental.
+- La compilación no debe producir advertencias.
 
-Implementa SOLO la tarea asignada. Si detectas trabajo fuera de su alcance,
-repórtalo al terminar en vez de hacerlo.
+Alcance:
+- Implementa SOLO las tareas asignadas. Si detectas trabajo fuera de alcance, repórtalo en vez de hacerlo.
+- No edites tasks.md. La sesión principal marca las tareas completadas.
+- Si trabajas en paralelo con otro agente, no toques pom.xml ni application*.yml salvo que tu tarea lo pida explícitamente.
 
-Al final entrega: archivos tocados, decisiones que tomaste y qué quedó pendiente.
+Antes de terminar, ejecuta ./mvnw -q compile (o ./mvnw verify si la tarea lo pide) y confirma que pasa.
+Entrega: tareas implementadas, archivos tocados, decisiones tomadas, y qué quedó pendiente o fuera de alcance.
