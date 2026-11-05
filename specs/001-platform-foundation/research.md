@@ -170,6 +170,12 @@ Principio III.
 - **Detalle**: `anyRequest().authenticated()` hace que una ruta inexistente sin credenciales
   devuelva 401 (edge case de la spec). El cuerpo del 401 es genérico y no indica si el token
   expiró o tiene una firma inválida.
+- **Nota (2026-11-05)**: en Spring 7 `ProblemDetail.type` es `null` por defecto y se omite al
+  serializar (antes valía `about:blank`). Por eso todo `ProblemDetail` del proyecto (el
+  `ProblemDetailsResponseWriter` y los errores de MVC) fija `type = about:blank` de forma
+  explícita; el `ProblemDetailJacksonMixin` usa `NON_EMPTY`, así que un type fijado sí sale.
+- **Nota (2026-11-05)**: el `Content-Type` es `application/problem+json` sin el parámetro
+  `charset` (coherente con MVC; RFC 8259 §11 y RFC 9457 no lo definen). El cuerpo son bytes UTF-8.
 
 ## R11. CORS
 
