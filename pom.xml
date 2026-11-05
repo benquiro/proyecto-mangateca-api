@@ -262,6 +262,11 @@
 						<include>**/*Tests.java</include>
 						<include>**/*IT.java</include>
 					</includes>
+					<!-- ADR-006 (docs/adr/ADR-006-token-issuance.md): los tests corren con el perfil test
+					     (issuer fijo en src/test/resources/application-test.yaml, claves efimeras). -->
+					<systemPropertyVariables>
+						<spring.profiles.active>test</spring.profiles.active>
+					</systemPropertyVariables>
 				</configuration>
 			</plugin>
 		</plugins>

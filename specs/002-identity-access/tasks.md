@@ -47,7 +47,7 @@ Proyecto Maven único. Producción en `src/main/java/com/mangateca/api/`, tests 
 **Purpose**: decisión de arquitectura documentada y activación del perfil `test`. El plan no
 requiere dependencias nuevas; el único ajuste de `pom.xml` (T003) está justificado en ADR-006.
 
-- [ ] T001 [DOC] Escribir ADR-006 en `docs/adr/ADR-006-token-issuance.md` con las secciones obligatorias de la 001 (Estado `Aceptado`, Fecha, Contexto, Alternativas, Decisión, Compatibilidad, Mantenimiento, Consecuencias). Decisión:
+- [X] T001 [DOC] Escribir ADR-006 en `docs/adr/ADR-006-token-issuance.md` con las secciones obligatorias de la 001 (Estado `Aceptado`, Fecha, Contexto, Alternativas, Decisión, Compatibilidad, Mantenimiento, Consecuencias). Decisión:
   - Emisión propia de JWT RS256 con `NimbusJwtEncoder` y claims `sub`, `roles`, `iss`, `iat` y `exp` de 15 min.
   - Un único par RSA en `identity` alimenta `JwtEncoder` y `JwtDecoder`, con validador de `iss`.
   - Claves efímeras en memoria en los perfiles `dev`/`test` cuando no hay claves configuradas; PEM por variables de entorno (`MANGATECA_IDENTITY_JWT_*_LOCATION`) en producción; fallo de arranque en cualquier otro caso.
@@ -55,13 +55,13 @@ requiere dependencias nuevas; el único ajuste de `pom.xml` (T003) está justifi
   - Activación del perfil `test` desde Surefire.
 
   Alternativas descartadas: Spring Authorization Server, IdP externo, HS256, claves versionadas, PEM inline. Condición de revisión: segunda aplicación cliente, login social o MFA (research R1, R3, R4, R7, R8). Cubre FR-007, FR-008, FR-015, FR-021 e Higiene Operacional.
-- [ ] T002 [P] [DOC] Marcar ADR-003 en `docs/adr/ADR-003-oauth2-resource-server.md` con el Estado `Reemplazado parcialmente por ADR-006 (Superseded in part by ADR-006)`. El vocabulario de estados de la 001 está en castellano y se conserva el texto pedido entre paréntesis. Añadir una sección «Reemplazo parcial» que liste:
+- [X] T002 [P] [DOC] Marcar ADR-003 en `docs/adr/ADR-003-oauth2-resource-server.md` con el Estado `Reemplazado parcialmente por ADR-006 (Superseded in part by ADR-006)`. El vocabulario de estados de la 001 está en castellano y se conserva el texto pedido entre paréntesis. Añadir una sección «Reemplazo parcial» que liste:
   - Lo reemplazado: el origen de la clave pública vía `spring.security.oauth2.resourceserver.jwt.public-key-location`, `DevJwtDecoderConfiguration` y la nota «esta feature no emite tokens».
   - Lo que sigue vigente: resource server nativo, RS256, starter `spring-boot-starter-security-oauth2-resource-server` y ninguna librería JWT de terceros.
 
   Referencia: research R4.
-- [ ] T003 [CONFIG] Añadir a `maven-surefire-plugin` en `pom.xml` `<systemPropertyVariables><spring.profiles.active>test</spring.profiles.active></systemPropertyVariables>`, con un comentario que cite ADR-006. No añadir dependencias (plan, Configuración de tests).
-- [ ] T004 [CONFIG] Crear `src/test/resources/application-test.yaml` con `mangateca.identity.jwt.issuer: mangateca-test` y nada más: sin claves (contracts/configuration.md, Perfiles).
+- [X] T003 [CONFIG] Añadir a `maven-surefire-plugin` en `pom.xml` `<systemPropertyVariables><spring.profiles.active>test</spring.profiles.active></systemPropertyVariables>`, con un comentario que cite ADR-006. No añadir dependencias (plan, Configuración de tests).
+- [X] T004 [CONFIG] Crear `src/test/resources/application-test.yaml` con `mangateca.identity.jwt.issuer: mangateca-test` y nada más: sin claves (contracts/configuration.md, Perfiles).
 
 **Checkpoint**: `./mvnw verify` en verde. Pasan todos los tests de 001 sin cambios
 (`DevJwtDecoderConfiguration` solo aplica a `dev`, y `TestSecurityConfiguration` sigue aportando

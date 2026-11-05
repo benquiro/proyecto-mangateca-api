@@ -1,0 +1,4 @@
+mangateca:
+  identity:
+    jwt:
+      issuer: mangateca-test
