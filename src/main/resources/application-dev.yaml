@@ -1,0 +1,8 @@
+spring:
+  docker:
+    compose:
+      lifecycle-management: start-and-stop
+
+mangateca:
+  cors:
+    allowed-origins: http://localhost:5173

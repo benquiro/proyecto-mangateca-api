@@ -1,3 +1,47 @@
 spring:
   application:
     name: api
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  web:
+    error:
+      include-stacktrace: never
+      include-message: never
+      include-binding-errors: never
+  flyway:
+    validate-on-migrate: true
+    clean-disabled: true
+    # Lista vacia (forma [], verificada con SchemaDriftIT caso 2): Flyway ignora por defecto
+    # '*:future', y una migracion aplicada que no existe localmente no haria fallar el arranque.
+    ignore-migration-patterns: []
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      show-components: always
+  info:
+    env:
+      enabled: false
+    java:
+      enabled: false
+    os:
+      enabled: false
+    git:
+      enabled: false
+
+logging:
+  structured:
+    format:
+      console: ecs

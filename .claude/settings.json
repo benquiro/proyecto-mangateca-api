@@ -12,8 +12,11 @@
     ],
     "deny": [
       "Bash(git push:*)",
-      "Read(./.env)",
-      "Read(./src/main/resources/application-local.*)"
+      "Read(./.env)"
     ]
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
   }
 }

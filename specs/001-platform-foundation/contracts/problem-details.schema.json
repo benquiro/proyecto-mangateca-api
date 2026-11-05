@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mangateca:contracts:problem-details",
+  "title": "ProblemDetail (RFC 9457) — Mangateca API",
+  "description": "Cuerpo de toda respuesta de error. Content-Type: application/problem+json.",
+  "type": "object",
+  "required": ["type", "title", "status", "detail", "instance"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "format": "uri-reference",
+      "const": "about:blank"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Frase HTTP estándar del código de estado."
+    },
+    "status": {
+      "type": "integer",
+      "description": "Cualquier código 4xx o 5xx respondido en Problem Details (incluye otros 4xx/5xx del framework, p. ej. 406, 413 o 503). El 503 del health DOWN usa el formato propio de Actuator y no se rige por este esquema.",
+      "minimum": 400,
+      "maximum": 599
+    },
+    "detail": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Mensaje legible y genérico. MUST NOT contener nombres de clases, SQL, trazas ni mensajes de excepción internos."
+    },
+    "instance": {
+      "type": "string",
+      "format": "uri-reference",
+      "description": "Ruta de la petición."
+    },
+    "errors": {
+      "type": "array",
+      "description": "Solo presente en errores de validación (400).",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["field", "message"],
+        "properties": {
+          "field": { "type": "string", "minLength": 1 },
+          "message": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "not": {
+    "anyOf": [
+      { "required": ["trace"] },
+      { "required": ["stackTrace"] },
+      { "required": ["exception"] }
+    ]
+  }
+}

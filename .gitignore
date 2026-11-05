@@ -62,5 +62,7 @@ out/
 .env
 .env.local
 .env.*.local
+*.pem
+*.key
 hs_err_pid*
 replay_pid*

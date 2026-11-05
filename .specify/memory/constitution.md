@@ -1,250 +1,161 @@
-<!--
-SYNC IMPACT REPORT (temporal; eliminar antes de commitear la constitución)
-- Cambio de versión: (plantilla sin versionar) → 1.0.0
-- Tipo de bump: MAJOR inicial (primera ratificación; no existía versión previa).
-- Principios definidos (plantilla → nuevo título):
-  - [PRINCIPLE_1_NAME] → I. Monolito Modular con Límites Verificados
-  - [PRINCIPLE_2_NAME] → II. Integridad del Dominio
-  - [PRINCIPLE_3_NAME] → III. Stack Estable y Disciplina de Dependencias
-  - [PRINCIPLE_4_NAME] → IV. Persistencia Controlada y Contrato de API
-  - [PRINCIPLE_5_NAME] → V. Seguridad por Defecto
-  - (nuevo)            → VI. Calidad Verificable
-- Secciones añadidas:
-  - Metadatos y Jerarquía Normativa
-  - Higiene Operacional (antes [SECTION_2_NAME])
-  - Flujo de Desarrollo y Definition of Done (antes [SECTION_3_NAME])
-  - Gobernanza (enmiendas, versionado, cumplimiento)
-- Secciones eliminadas: ninguna.
-- Plantillas dependientes: no modificadas (leen la constitución en tiempo de ejecución).
-- TODOs diferidos:
-  - TODO(ADR_DEPENDENCIAS): registrar en docs/adr/ las dependencias exigidas por esta
-    constitución que aún no están en pom.xml: Spring Modulith, MapStruct,
-    spring-boot-starter-oauth2-resource-server y el plugin JaCoCo.
-  - TODO(BUILD_GATES): configurar -Xlint:all + -Werror y el umbral JaCoCo en pom.xml
-    (se realiza en una feature, no en esta enmienda).
--->
-
 # Constitución de Mangateca API
 
-| Campo                    | Valor      |
-|--------------------------|------------|
-| Versión                  | 1.0.0      |
-| Estado                   | Activo     |
-| Fecha de ratificación    | 2026-11-05 |
-| Fecha de última enmienda | 2026-11-05 |
+Palabras clave MUST, MUST NOT, SHOULD, SHOULD NOT, MAY según RFC 2119.
 
-Las palabras clave MUST, MUST NOT, REQUIRED, SHOULD, SHOULD NOT y MAY se interpretan según
-RFC 2119. Cada regla incluye su justificación (*Por qué*).
+## Jerarquía Normativa
 
-## Metadatos y Jerarquía Normativa
+- Esta Constitución prevalece sobre `spec.md`, `plan.md`, `tasks.md`, ADR y código existente.
+- Todo artefacto que la contradiga MUST considerarse inválido y corregirse antes de integrarse;
+  el conflicto MUST NOT resolverse reinterpretando la Constitución.
+- Sistema: backend REST de e-commerce consumido por un cliente SPA desacoplado.
 
-- Esta Constitución es la ley suprema del repositorio y prevalece sobre todo `spec.md`,
-  `plan.md`, `tasks.md`, ADR o código preexistente.
-  *Por qué*: una única fuente de verdad elimina ambigüedad al resolver conflictos de diseño.
-- Todo artefacto inferior que contradiga esta Constitución MUST considerarse inválido y
-  corregirse antes de integrarse; el conflicto NO se resuelve reinterpretando la Constitución.
-  *Por qué*: si los artefactos derivados pudieran imponerse, las reglas se erosionarían por
-  acumulación de excepciones.
-- **Naturaleza del sistema**: "Mangateca API" es el backend REST de comercio electrónico
-  (catálogo, compras y administración) consumido por un cliente SPA desacoplado, construido con
-  estándares profesionales de industria.
-
-## Principios Fundamentales
+## Core Principles
 
 ### I. Monolito Modular con Límites Verificados
 
-- El sistema MUST desplegarse como un único monolito modular. Se MUST preferir simplicidad,
-  legibilidad y cohesión sobre abstracción prematura (YAGNI).
-  *Por qué*: el dominio y el equipo no justifican el coste operativo de microservicios; la
-  modularidad interna conserva la opción de extraerlos más adelante.
-- El código MUST organizarse en módulos de dominio vertical (p. ej. `catalog`, `user`, `cart`,
-  `order`, `payment`, `review`) y MUST NOT organizarse en capas técnicas horizontales globales
-  (`controllers/`, `services/`, `repositories/` a nivel raíz).
-  *Por qué*: la cohesión por capacidad de negocio localiza los cambios y hace visibles las
-  dependencias entre módulos.
-- Los límites de módulo MUST verificarse en la suite de tests mediante Spring Modulith
-  (`ApplicationModules.of(...).verify()`); un fallo de verificación MUST romper el build.
-  *Por qué*: una regla arquitectónica no verificada automáticamente se degrada con el tiempo.
-- Un módulo MUST NOT acceder a repositorios, entidades JPA ni tipos internos de otro módulo.
-  La interacción MUST ocurrir solo vía la API pública del módulo (servicios/interfaces en su
-  paquete raíz o expuestos explícitamente) o mediante eventos de dominio publicados con
-  `ApplicationEventPublisher`.
-  *Por qué*: el acoplamiento a internals ajenos impide evolucionar un módulo sin romper otros.
-- Las integraciones con terceros aún no implementadas (p. ej. pasarela de pago) MUST modelarse
-  como contratos de dominio (`PaymentGateway`) con una implementación simulada desacoplada.
-  *Por qué*: sustituir el simulador por la integración real no debe alterar el dominio de
-  órdenes.
+- MUST desplegarse como un único monolito modular.
+- El código MUST organizarse en módulos de dominio vertical; capas técnicas horizontales globales
+  (`controllers/`, `services/`, `repositories/` en raíz) MUST NOT existir.
+- Los límites MUST verificarse con Spring Modulith (`ApplicationModules.of(...).verify()`); un
+  fallo MUST romper el build.
+- Un módulo MUST NOT acceder a repositorios, entidades JPA ni tipos internos de otro. La
+  interacción MUST ocurrir solo vía la API pública del módulo (paquete raíz o expuesta
+  explícitamente) o eventos de dominio vía `ApplicationEventPublisher`.
+- Integraciones de terceros no implementadas MUST modelarse como puerto de dominio
+  (p. ej. `PaymentGateway`) con implementación simulada desacoplada.
 
 ### II. Integridad del Dominio
 
-- Las invariantes de negocio MUST validarse en el dominio (constructores, fábricas estáticas o
-  constructores compactos de records), de modo que no pueda existir un objeto inválido.
-  *Por qué*: validar solo en el borde HTTP deja al dominio expuesto a otros puntos de entrada
-  (eventos, jobs, tests).
-- Los valores monetarios MUST representarse con `BigDecimal` o con un Value Object inmutable
-  `Money`; `double` y `float` MUST NOT usarse para dinero.
-  *Por qué*: la coma flotante binaria no representa exactamente fracciones decimales y produce
-  errores de redondeo en totales e impuestos.
-- Los identificadores de negocio (ISBN, Email, etc.) SHOULD modelarse como Value Objects
-  inmutables (`record`) con validación propia.
-  *Por qué*: evita la "obsesión por primitivos" y centraliza la validación de formato.
+- Las invariantes MUST validarse en el dominio (constructores, fábricas estáticas, constructores
+  compactos de records); un objeto inválido MUST NOT poder existir.
+- Dinero MUST representarse con `BigDecimal` o un VO inmutable `Money`; `double`/`float` MUST NOT.
+- Identificadores de negocio (ISBN, Email, etc.) SHOULD ser VO `record` con validación propia.
 
 ### III. Stack Estable y Disciplina de Dependencias
 
-- Runtime: Java 25 (LTS) con Maven Wrapper. Se SHOULD usar features estables del lenguaje
-  (records, sealed types, pattern matching, switch expressions).
-  *Por qué*: una LTS garantiza soporte prolongado; las features modernas reducen boilerplate.
-- Frameworks base: Spring Boot 4.1.x (Spring Framework 7, Spring Security 7, Spring MVC) y
-  OpenAPI 3 mediante `springdoc-openapi`.
-  *Por qué*: alinea el proyecto con la generación actual soportada del ecosistema Spring.
-- MUST usarse exclusivamente APIs estables y documentadas oficialmente. APIs deprecadas,
-  experimentales, en incubación (`jdk.incubator.*`) o en preview (`--enable-preview`) MUST NOT
-  usarse.
-  *Por qué*: estas APIs pueden cambiar o desaparecer sin aviso, generando deuda de migración.
+- Runtime: Java 25 LTS con Maven Wrapper. Base: Spring Boot 4.1.x (Spring Framework 7,
+  Security 7, MVC) y OpenAPI 3 vía `springdoc-openapi`.
+- Solo APIs estables y documentadas. APIs deprecadas, experimentales, `jdk.incubator.*` o preview
+  (`--enable-preview`) MUST NOT usarse.
 - Las dependencias base del `pom.xml` inicial MUST NOT eliminarse.
-  *Por qué*: constituyen la línea base acordada del stack sobre la que se diseñan las features.
-- Toda dependencia externa nueva MUST justificarse en un ADR en `docs/adr/` que evalúe:
-  necesidad concreta, descarte de APIs nativas de Java/Spring, estado de mantenimiento, licencia
-  y compatibilidad con Java 25 / Spring Boot 4. Las capacidades nativas del runtime MUST
-  priorizarse sobre librerías de terceros.
-  *Por qué*: cada dependencia amplía la superficie de ataque, el riesgo de licencia y el coste
-  de actualización.
-- DTOs, comandos, eventos y Value Objects MUST implementarse como `record` de Java.
-  *Por qué*: los records son inmutables y tienen `equals`/`hashCode` correctos por diseño.
-- Lombok MAY usarse exclusivamente en entidades JPA. `@Data` MUST NOT usarse en entidades JPA.
-  *Por qué*: `@Data` genera `equals`, `hashCode` y `toString` sobre todos los campos, lo que
-  rompe la identidad con proxies de Hibernate y dispara cargas lazy o recursión infinita.
+- Toda dependencia externa nueva MUST justificarse en un ADR (`docs/adr/`) evaluando: necesidad,
+  descarte de APIs nativas Java/Spring, mantenimiento, licencia y compatibilidad Java 25/Boot 4.
+  Las capacidades nativas MUST priorizarse.
+- DTOs, comandos, eventos y VOs MUST ser `record`.
+- Lombok MAY usarse solo en entidades JPA; `@Data` MUST NOT usarse en ellas.
 
-### IV. Persistencia Controlada y Contrato de API
+### IV. Persistencia y Contrato de API
 
-- PostgreSQL MUST ser el único motor de base de datos.
-  *Por qué*: un solo motor evita divergencias de dialecto entre entornos.
-- Todo cambio de esquema MUST realizarse con migraciones versionadas de Flyway. Una migración
-  ya aplicada MUST NOT modificarse; las correcciones se hacen con una migración nueva.
-  *Por qué*: el esquema debe ser reproducible y el checksum de Flyway detecta alteraciones.
-- `spring.jpa.hibernate.ddl-auto` MUST ser `validate` y `spring.jpa.open-in-view` MUST ser
-  `false`.
-  *Por qué*: Hibernate no debe alterar el esquema gestionado por Flyway, y OSIV oculta consultas
-  lazy fuera de la transacción.
-- Las consultas N+1 MUST NOT existir; MUST resolverse con `fetch join`, `@EntityGraph` o
-  proyecciones.
-  *Por qué*: N+1 degrada el rendimiento de forma lineal con el volumen de datos.
-- Las entidades JPA MUST NOT exponerse fuera de su módulo ni en la API HTTP. Toda entrada y
-  salida HTTP MUST usar DTOs `record` mapeados con MapStruct.
-  *Por qué*: desacopla el contrato público del modelo de persistencia y evita fugas de datos.
-- Las rutas MUST versionarse bajo `/api/v1` y usar sustantivos en plural.
-  *Por qué*: permite evolucionar el contrato sin romper al cliente SPA.
-- Los errores MUST unificarse en un `@RestControllerAdvice` que retorne `ProblemDetail`
-  (RFC 9457). Stack traces, mensajes de excepción internos y detalles de SQL MUST NOT exponerse.
-  *Por qué*: un formato estándar simplifica el cliente y ocultar internals evita filtrar
-  información útil para un atacante.
-- Todo listado MUST paginarse y MUST imponer un tamaño máximo de página.
-  *Por qué*: listados ilimitados permiten agotar memoria y ancho de banda.
-- `@Transactional` MUST declararse en la capa de aplicación, con `readOnly = true` en
-  operaciones de consulta.
-  *Por qué*: los casos de uso definen la unidad de trabajo; `readOnly` habilita optimizaciones
-  de Hibernate y del driver.
-- Los paquetes MUST anotarse con JSpecify (`@NullMarked`, `@Nullable` donde aplique). Servicios
-  y repositorios MUST NOT retornar `null` para colecciones (retornan colecciones vacías) y MUST
-  usar `Optional<T>` para resultados únicos opcionales.
-  *Por qué*: hace explícita la nulabilidad en el contrato y elimina `NullPointerException`
-  evitables.
+- **Persistencia**:
+  - PostgreSQL MUST ser el único motor.
+  - Cambios de esquema MUST hacerse con migraciones Flyway versionadas; una migración aplicada
+    MUST NOT modificarse (se corrige con una nueva).
+  - `spring.jpa.hibernate.ddl-auto=validate` y `spring.jpa.open-in-view=false` MUST.
+  - Consultas N+1 MUST NOT existir; resolver con `fetch join`, `@EntityGraph` o proyecciones.
+  - `@Transactional` MUST declararse en la capa de aplicación, con `readOnly = true` en consultas.
+- **Contrato HTTP**:
+  - Entidades JPA MUST NOT exponerse fuera de su módulo ni en HTTP; entrada/salida MUST usar DTOs
+    `record` mapeados con MapStruct.
+  - Rutas MUST versionarse bajo `/api/v1` con sustantivos en plural.
+  - Errores MUST unificarse en un `@RestControllerAdvice` que retorne `ProblemDetail` (RFC 9457);
+    stack traces, mensajes internos y detalles SQL MUST NOT exponerse.
+  - Todo listado MUST paginarse con tamaño máximo de página.
+- **Nulabilidad**: paquetes MUST anotarse con JSpecify (`@NullMarked`, `@Nullable`). Servicios y
+  repositorios MUST NOT retornar `null` para colecciones y MUST usar `Optional<T>` para
+  resultados únicos opcionales.
 
 ### V. Seguridad por Defecto
 
-- La autenticación MUST ser stateless con JWT usando exclusivamente el soporte nativo de Spring
-  Security (`oauth2-resource-server`, `NimbusJwtEncoder`/`JwtDecoder`). Librerías JWT de terceros
-  y filtros de servlet manuales para autenticación MUST NOT usarse.
-  *Por qué*: el soporte nativo está auditado y mantenido; las implementaciones manuales son una
-  fuente habitual de vulnerabilidades.
-- Los access tokens MUST tener vida corta (~15 minutos) y viajar en `Authorization: Bearer`.
-  *Por qué*: limita la ventana de abuso de un token filtrado.
-- Los refresh tokens MUST ser opacos, persistirse hasheados (nunca en claro) para permitir
-  revocación, y transmitirse en cookies `HttpOnly`, `Secure` y con `SameSite` explícito.
-  *Por qué*: el hash protege ante fuga de la base de datos y la cookie `HttpOnly` impide su
-  robo vía XSS.
-- Las contraseñas MUST almacenarse con un `PasswordEncoder` delegante (bcrypt por defecto).
-  *Por qué*: permite migrar de algoritmo sin invalidar hashes existentes.
-- La `SecurityFilterChain` MUST denegar por defecto (deny-by-default) y la autorización de
-  negocio MUST reforzarse con `@PreAuthorize` a nivel de método.
-  *Por qué*: un endpoint olvidado queda cerrado, no abierto.
-- Los roles MUST ser `CUSTOMER` y `ADMIN`. El acceso anónimo MUST limitarse a lectura del
-  catálogo y de reseñas públicas.
-  *Por qué*: un modelo de roles mínimo es fácil de auditar.
-- Un usuario autenticado MUST NOT leer ni modificar recursos de otro usuario (carrito, órdenes,
-  favoritos). La identidad MUST obtenerse del token, nunca de parámetros del cliente.
-  *Por qué*: previene vulnerabilidades IDOR/BOLA, primera categoría del OWASP API Top 10.
+- Autenticación MUST ser stateless con JWT usando solo soporte nativo de Spring Security
+  (`oauth2-resource-server`, `NimbusJwtEncoder`/`JwtDecoder`). Librerías JWT de terceros y
+  filtros servlet manuales de autenticación MUST NOT usarse.
+- Access tokens MUST durar ~15 min y viajar en `Authorization: Bearer`.
+- Refresh tokens MUST ser opacos, persistirse hasheados (nunca en claro, revocables) y viajar en
+  cookies `HttpOnly`, `Secure` y `SameSite` explícito.
+- Contraseñas MUST almacenarse con `PasswordEncoder` delegante (bcrypt por defecto).
+- `SecurityFilterChain` MUST ser deny-by-default; autorización de negocio MUST reforzarse con
+  `@PreAuthorize` a nivel de método.
+- Roles MUST ser `CUSTOMER` y `ADMIN`. Acceso anónimo MUST limitarse a lectura de catálogo y
+  reseñas públicas.
+- Un usuario MUST NOT leer ni modificar recursos de otro (anti IDOR/BOLA); la identidad MUST
+  obtenerse del token, nunca de parámetros del cliente.
 
-### VI. Calidad Verificable
+### VI. Calidad Verificable (Testing Pragmático)
 
-- Las pruebas unitarias de dominio MUST ejecutarse sin contexto de Spring ni base de datos.
-  *Por qué*: feedback en milisegundos y aislamiento de la lógica de negocio.
-- Los controladores y su autorización MUST probarse con `@WebMvcTest`; las consultas de
-  persistencia con `@DataJpaTest`.
-  *Por qué*: los slice tests validan cada capa con un contexto mínimo y rápido.
-- Los contratos de módulo MUST probarse con `@ApplicationModuleTest` y la arquitectura con
-  `ApplicationModules.verify()`.
-  *Por qué*: garantiza que cada módulo funciona aislado y que los límites del Principio I se
-  respetan.
-- Los tests que requieran base de datos MUST usar Testcontainers con PostgreSQL real vía
-  `@ServiceConnection`. Bases de datos en memoria (p. ej. H2) MUST NOT usarse.
-  *Por qué*: H2 difiere de PostgreSQL en dialecto, tipos y constraints, y oculta errores reales.
-- Los mocks MUST restringirse a fronteras de I/O externas (pasarela simulada, `Clock`).
-  Entidades, records y Value Objects MUST NOT mockearse.
-  *Por qué*: mockear el dominio prueba el mock, no el comportamiento.
-- La cobertura de líneas en las capas de dominio y aplicación MUST ser ≥ 80% medida con JaCoCo,
-  y el build de Maven MUST fallar si no se alcanza.
-  *Por qué*: un umbral automático impide que la cobertura se degrade silenciosamente.
-- La compilación MUST producir cero advertencias con `-Xlint:all`, tratándolas como errores.
-  *Por qué*: las advertencias ignoradas ocultan defectos reales (raw types, deprecaciones).
+- **Alcance**: se MUST testear solo lo vital; cobertura exhaustiva MUST NOT exigirse. No existe
+  umbral de cobertura obligatorio (JaCoCo u otro).
+- **Tests obligatorios** (MUST):
+  1. Arquitectura: `ApplicationModules.verify()` y un smoke test de arranque del contexto.
+  2. Invariantes de dominio con lógica de negocio real (dinero, stock, totales, estados de
+     orden), como tests unitarios sin Spring ni BD.
+  3. Seguridad crítica: deny-by-default, roles y propiedad de recursos (anti IDOR/BOLA).
+  4. Flujo feliz de cada endpoint crítico de negocio (auth, carrito, checkout/orden).
+- **Tests opcionales** (MAY): CRUD trivial, getters/mappers, DTOs, validaciones simples, casos
+  borde no críticos y `@ApplicationModuleTest` por módulo. `tasks.md` SHOULD NOT generarlos
+  salvo petición explícita en `spec.md`.
+- **Herramientas** (cuando se escriba el test): web/autorización con `@WebMvcTest`, consultas con
+  `@DataJpaTest`. Tests con BD MUST usar Testcontainers PostgreSQL vía `@ServiceConnection`; BD en
+  memoria (H2, etc.) MUST NOT.
+- Mocks MUST restringirse a fronteras de I/O externas (pasarela simulada, `Clock`); entidades,
+  records y VOs MUST NOT mockearse.
+- Compilación MUST tener cero advertencias con `-Xlint:all` y `failOnWarning`, tratadas como
+  errores. Única excepción permitida: la categoría `processing` (`-Xlint:all,-processing`),
+  justificada en ADR; cualquier otra exclusión MUST NOT hacerse.
+
+### VII. Pragmatismo Arquitectónico (KISS / YAGNI)
+
+- **Simplicidad**: toda solución MUST ser la más simple que resuelva el problema actual sin
+  romper invariantes (II). Diseñar para requisitos no explícitos en el `spec.md` activo MUST NOT.
+- **Cero interfaces especulativas**: servicios y componentes internos MUST ser clases concretas.
+  Una interfaz (p. ej. `IUserService` → `UserServiceImpl`) MUST NOT extraerse salvo que sea:
+  1. Fachada pública del módulo expuesta a otros módulos (Spring Modulith).
+  2. Puerto de salida a infraestructura externa o simulada (p. ej. `PaymentGateway`).
+  3. Contrato con ≥ 2 implementaciones reales existentes en el código.
+  Exentas: interfaces exigidas por el framework (Spring Data, MapStruct).
+- **SRP por cohesión**: una clase SHOULD NOT dividirse por tamaño si su lógica cambia por una
+  misma razón de negocio; se MUST preferir una clase cohesiva sobre fragmentos diminutos.
+- **OCP/DIP por evidencia**: puntos de extensión, jerarquías o inversiones de dependencia no
+  triviales MUST NOT introducirse hasta que el cambio o duplicación se repita en ≥ 2 escenarios
+  reales, o lo exija una frontera de módulo (I).
+- **Patrones GoF**: MUST NOT aplicarse por defecto; MAY usarse solo si eliminan complejidad
+  accidental evidente del problema actual.
+- **Nativo antes que patrón**: patrones especulativos MUST NOT usarse cuando `record`,
+  `sealed interface`, `switch` con pattern matching o funciones de orden superior de Java 25
+  resuelvan el problema. Variantes cerradas y conocidas MUST modelarse con `sealed` + pattern
+  matching, no con *Visitor* ni *Strategy*.
+- **Trade-off obligatorio**: toda abstracción, patrón o división de clases en `plan.md` MUST
+  documentar: (1) problema real que resuelve hoy; (2) alternativa simple descartada y por qué no
+  basta; (3) costo de indirección aceptado frente al beneficio.
 
 ## Higiene Operacional
 
-- Credenciales, secretos, claves de firma y tokens MUST NOT versionarse; MUST inyectarse
-  mediante variables de entorno.
-  *Por qué*: un secreto en el historial de Git se considera comprometido para siempre.
-- Todo DTO de entrada MUST validarse con Bean Validation (`@Valid`) antes de alcanzar la capa
-  de aplicación.
-  *Por qué*: rechaza datos malformados en el borde con errores consistentes.
-- CORS MUST configurarse explícitamente hacia el/los origen(es) del cliente web; el wildcard
-  `*` MUST NOT usarse.
-  *Por qué*: con credenciales (cookies) un origen abierto expone la API a sitios maliciosos.
-- Actuator MUST exponer únicamente `health` e `info`.
-  *Por qué*: endpoints como `env`, `heapdump` o `configprops` filtran información sensible.
-- El logging MUST usar el formato estructurado nativo de Spring Boot. Contraseñas, tokens y PII
+- Secretos, credenciales, claves de firma y tokens MUST NOT versionarse; MUST inyectarse por
+  variables de entorno.
+- Todo DTO de entrada MUST validarse con Bean Validation (`@Valid`) antes de la capa de
+  aplicación.
+- CORS MUST configurarse explícitamente hacia los orígenes del cliente; `*` MUST NOT usarse.
+- Actuator MUST exponer solo `health` e `info`.
+- Logging MUST usar el formato estructurado nativo de Spring Boot; contraseñas, tokens y PII
   MUST NOT registrarse.
-  *Por qué*: logs estructurados son consultables; los logs con datos sensibles son una fuga.
 
 ## Flujo de Desarrollo y Definition of Done
 
-- Ningún cambio de código MUST integrarse sin su `spec.md`, `plan.md` y `tasks.md` aprobados
-  (flujo Specification-Driven Development con Spec Kit).
-  *Por qué*: la especificación previa hace que la implementación sea verificable contra un
-  objetivo explícito.
-- El `plan.md` de cada feature MUST incluir una verificación de cumplimiento ("Constitution
-  Check") contra estos principios; toda desviación MUST justificarse o eliminarse.
-  *Por qué*: detecta incumplimientos en diseño, antes de que sean costosos.
-- Una tarea se considera terminada (DoD) solo si: compila sin advertencias, todos los tests
-  pasan (incluida `ApplicationModules.verify()`), se cumple el umbral de cobertura, la API
-  afectada queda documentada en OpenAPI y no se viola ninguna regla de esta Constitución.
-  *Por qué*: un criterio de cierre objetivo evita trabajo "casi terminado".
+- Ningún cambio de código MUST integrarse sin `spec.md`, `plan.md` y `tasks.md` aprobados
+  (Spec Kit / SDD).
+- Cada `plan.md` MUST incluir un "Constitution Check" contra estos principios, incluidos los
+  trade-offs de VII; toda desviación MUST justificarse o eliminarse.
+- DoD: compila sin advertencias, la app arranca, los tests obligatorios de VI pasan (incl.
+  `ApplicationModules.verify()`), API afectada documentada en OpenAPI y ninguna regla violada.
 
-## Gobernanza
+## Governance
 
-- **Precedencia**: esta Constitución prevalece sobre cualquier otra práctica, guía o artefacto
-  del repositorio (ver *Metadatos y Jerarquía Normativa*).
-- **Enmiendas**: toda modificación MUST realizarse en un Pull Request dedicado que justifique
-  la decisión. Si la enmienda afecta la arquitectura o las dependencias, MUST acompañarse de un
-  ADR formal en `docs/adr/`.
-  *Por qué*: deja trazabilidad del razonamiento detrás de cada cambio normativo.
-- **Versionado semántico** (MUST):
-  - **MAJOR**: modificación, relajación o eliminación de principios o reglas existentes.
-  - **MINOR**: incorporación de nuevos principios o reglas invariantes.
-  - **PATCH**: correcciones tipográficas o aclaraciones de redacción sin impacto normativo.
-- **Registro**: el encabezado MUST mantener actualizados Versión, Estado y Fecha de última
-  enmienda (formato ISO `YYYY-MM-DD`).
-- **Cumplimiento**: toda revisión de código (humana o mediante el agente `spec-reviewer`) MUST
-  verificar el cumplimiento de esta Constitución. Cualquier complejidad adicional MUST
-  justificarse explícitamente en el `plan.md` correspondiente.
+- **Precedencia**: ver *Jerarquía Normativa*.
+- **Enmiendas**: MUST realizarse en un PR dedicado que justifique la decisión; si afectan
+  arquitectura o dependencias, MUST acompañarse de un ADR en `docs/adr/`.
+- **Versionado semántico** (MUST): MAJOR = modificar, relajar o eliminar reglas; MINOR = añadir
+  principios o reglas; PATCH = redacción o aclaraciones sin impacto normativo.
+- **Registro**: la línea de versión MUST mantener Versión, Estado y fechas en ISO `YYYY-MM-DD`.
+- **Cumplimiento**: toda revisión de código (humana o agente `spec-reviewer`) MUST verificar esta
+  Constitución; toda complejidad adicional MUST justificarse en `plan.md` según VII.
 
-**Versión**: 1.0.0 | **Estado**: Activo | **Ratificada**: 2026-11-05 | **Última enmienda**: 2026-11-05
+**Versión**: 3.0.0 | **Estado**: Activo | **Ratificada**: 2026-11-05 | **Última enmienda**: 2026-11-05
