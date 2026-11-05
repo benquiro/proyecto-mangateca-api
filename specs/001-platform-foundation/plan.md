@@ -227,11 +227,15 @@ Surefire en `./mvnw verify` (no se añade Failsafe: Principio VII).
 
 | Riesgo | Mitigación |
 |--------|------------|
-| `-Xlint:processing` con Lombok/MapStruct produce advertencias | Se verifica en el paso 2; si ocurre, se enmienda ADR-005 y se registra aquí (R14) |
+| `-Xlint:processing` con Lombok/MapStruct produce advertencias | **Materializado en T010**: `No processor claimed any of these annotations` en `default-compile` (`SpringBootApplication`) y en `default-testCompile` (anotaciones de Spring/JUnit/Testcontainers). Mitigado con `-Xlint:all,-processing` en ambas ejecuciones; ADR-005 enmendado el 2026-11-05 (R14) |
 | MapStruct 1.6.3 con `--release 25` | Se detecta en el paso 2; si falla, se reabre ADR-002 |
 | Expresar en YAML un `ignore-migration-patterns` vacío | Lo cubre el test de migración *future* en `SchemaDriftIT` (R5) |
 | Regla JaCoCo vacía en esta feature | Se demuestra con quickstart §4b y se ejercita en la primera feature de negocio |
 
 ## Complexity Tracking
 
-Sin violaciones constitucionales que justificar.
+Se trata de una **desviación explícita del texto literal del Principio VI** (`.specify/memory/constitution.md` L172: "cero advertencias con `-Xlint:all`"), aprobada por el usuario el 2026-11-05 y justificada en ADR-005 (enmienda del 2026-11-05). Queda pendiente formalizarla con una enmienda PATCH de la constitución mediante su procedimiento de gobierno, cuya decisión corresponde al usuario. Hasta entonces, la constitución prevalece sobre los artefactos inferiores (constitution.md L18).
+
+| Desviación | Por qué | Alternativa descartada |
+|------------|---------|------------------------|
+| `-Xlint:all,-processing` en `default-compile` y `default-testCompile` (solo la categoría `processing`; `failOnWarning` intacto) | La advertencia `No processor claimed any of these annotations` es esperada y no accionable: Lombok y MapStruct no reclaman anotaciones de Spring/JUnit | `@SuppressWarnings` en código: javac no suprime esta advertencia por anotación. Mantener `-Xlint:all` completo: rompería el build sin posibilidad de corrección |
