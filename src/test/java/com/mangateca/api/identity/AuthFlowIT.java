@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.mangateca.api.TestSecurityConfiguration;
 import com.mangateca.api.TestSecurityConfiguration.TestTokens;
 import com.mangateca.api.TestcontainersConfiguration;
+import com.mangateca.api.identity.domain.RefreshToken;
+import com.mangateca.api.identity.domain.RefreshTokenRepository;
+import com.mangateca.api.identity.domain.User;
+import com.mangateca.api.identity.domain.UserRepository;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -33,6 +37,10 @@ class AuthFlowIT {
   @Autowired private RestTestClient client;
 
   @Autowired private TestTokens testTokens;
+
+  @Autowired private UserRepository userRepository;
+
+  @Autowired private RefreshTokenRepository refreshTokenRepository;
 
   @Nested
   class Register {
@@ -180,6 +188,33 @@ class AuthFlowIT {
       }
       assertThat(b).isEqualTo(a);
     }
+
+    @Test
+    @DisplayName("FR-010 / FR-011: 5 fallos persisten el contador y bloquean la cuenta aunque la contrasena sea correcta")
+    void shouldPersistFailedAttemptsAndLockAccountAfterFiveFailures() {
+      String email = uniqueEmail();
+      String password = "S3cret-pass-123";
+      UUID userId = UUID.fromString(register(email, password).path("id").asString());
+      EntityExchangeResult<String> firstFailure = login(email, "Wrong-pass-999");
+
+      for (int i = 1; i < 5; i++) {
+        assertThat(login(email, "Wrong-pass-999").getStatus().value()).isEqualTo(401);
+      }
+
+      User persisted = userRepository.findById(userId).orElseThrow();
+      assertThat(persisted.getFailedLoginAttempts()).isEqualTo(5);
+      assertThat(persisted.getLockedUntil()).isNotNull();
+
+      EntityExchangeResult<String> locked = login(email, password);
+      assertThat(locked.getStatus().value()).isEqualTo(401);
+      ObjectNode expected = (ObjectNode) MAPPER.readTree(firstFailure.getResponseBody());
+      ObjectNode actual = (ObjectNode) MAPPER.readTree(locked.getResponseBody());
+      for (String variable : new String[] {"instance", "timestamp", "traceId"}) {
+        expected.remove(variable);
+        actual.remove(variable);
+      }
+      assertThat(actual).isEqualTo(expected);
+    }
   }
 
   @Nested
@@ -214,6 +249,25 @@ class AuthFlowIT {
 
       EntityExchangeResult<String> afterLogout = postWithCookie("/api/v1/auth/refresh", second);
       assertThat(afterLogout.getStatus().value()).isEqualTo(401);
+    }
+
+    @Test
+    @DisplayName("FR-013: reutilizar un refresh token rotado revoca toda la familia y la revocacion se confirma")
+    void shouldRevokeWholeFamilyAndCommitWhenRotatedTokenIsReused() {
+      String email = uniqueEmail();
+      String password = "S3cret-pass-123";
+      UUID userId = UUID.fromString(register(email, password).path("id").asString());
+      String original = refreshCookieValue(login(email, password));
+      String rotated = refreshCookieValue(postWithCookie("/api/v1/auth/refresh", original));
+
+      EntityExchangeResult<String> reuse = postWithCookie("/api/v1/auth/refresh", original);
+      assertThat(reuse.getStatus().value()).isEqualTo(401);
+
+      assertThat(postWithCookie("/api/v1/auth/refresh", rotated).getStatus().value()).isEqualTo(401);
+      List<RefreshToken> family =
+          refreshTokenRepository.findAll().stream().filter(t -> t.getUserId().equals(userId)).toList();
+      assertThat(family).hasSize(2);
+      assertThat(family).allSatisfy(t -> assertThat(t.getRevokedAt()).isNotNull());
     }
   }
 
