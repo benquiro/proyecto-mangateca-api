@@ -90,6 +90,21 @@ class AuthFlowIT {
     return MAPPER.readTree(Base64.getUrlDecoder().decode(parts[1]));
   }
 
+  private EntityExchangeResult<String> postWithCookie(String uri, String cookieValue) {
+    return client
+        .post()
+        .uri(uri)
+        .header("Cookie", "refresh_token=" + cookieValue)
+        .exchange()
+        .returnResult(String.class);
+  }
+
+  private static String refreshCookieValue(EntityExchangeResult<String> result) {
+    String header = result.getResponseHeaders().getFirst("Set-Cookie");
+    assertThat(header).isNotNull().startsWith("refresh_token=");
+    return header.substring("refresh_token=".length(), header.indexOf(';'));
+  }
+
   @Nested
   class Login {
 
@@ -158,6 +173,41 @@ class AuthFlowIT {
         b.remove(variable);
       }
       assertThat(b).isEqualTo(a);
+    }
+  }
+
+  @Nested
+  class Session {
+
+    @Test
+    @DisplayName("FR-012 / FR-014: refresh rota la cookie, la anterior queda invalida y logout cierra la sesion")
+    void shouldRotateRefreshTokenAndInvalidateSessionOnLogout() {
+      String email = uniqueEmail();
+      String password = "S3cret-pass-123";
+      register(email, password);
+      String first = refreshCookieValue(login(email, password));
+
+      EntityExchangeResult<String> refreshed = postWithCookie("/api/v1/auth/refresh", first);
+
+      assertThat(refreshed.getStatus().value()).isEqualTo(200);
+      assertThat(refreshed.getResponseBody()).isNotNull().doesNotContain("refresh_token");
+      assertThat(MAPPER.readTree(refreshed.getResponseBody()).path("access_token").asString()).isNotBlank();
+      String second = refreshCookieValue(refreshed);
+      assertThat(second).isNotEqualTo(first);
+      assertThat(refreshed.getResponseHeaders().getFirst("Set-Cookie"))
+          .contains("Max-Age=604800", "Path=/api/v1/auth", "HttpOnly", "Secure");
+
+      EntityExchangeResult<String> reused = postWithCookie("/api/v1/auth/refresh", first);
+      assertThat(reused.getStatus().value()).isEqualTo(401);
+      assertThat(MAPPER.readTree(reused.getResponseBody()).path("type").asString())
+          .isEqualTo("urn:mangateca:problem:invalid-refresh-token");
+
+      EntityExchangeResult<String> loggedOut = postWithCookie("/api/v1/auth/logout", second);
+      assertThat(loggedOut.getStatus().value()).isEqualTo(204);
+      assertThat(loggedOut.getResponseHeaders().getFirst("Set-Cookie")).contains("Max-Age=0");
+
+      EntityExchangeResult<String> afterLogout = postWithCookie("/api/v1/auth/refresh", second);
+      assertThat(afterLogout.getStatus().value()).isEqualTo(401);
     }
   }
 }
