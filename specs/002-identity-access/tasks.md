@@ -351,7 +351,7 @@ recursos.
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T059 [US5] [TEST] Crear `BootstrapAdminIT` en `src/test/java/com/mangateca/api/identity/BootstrapAdminIT.java` con `@SpringBootTest`, `@Import(TestcontainersConfiguration.class)` y `OutputCaptureExtension`, en dos `@Nested`:
+- [X] T059 [US5] [TEST] Crear `BootstrapAdminIT` en `src/test/java/com/mangateca/api/identity/BootstrapAdminIT.java` con `@SpringBootTest`, `@Import(TestcontainersConfiguration.class)` y `OutputCaptureExtension`, en dos `@Nested`:
   - **Configurado**, con `properties` `mangateca.identity.bootstrap-admin.email/password`:
     - Tras el arranque, `existsByRole(ADMIN)` y la salida capturada no contiene la contraseña (Escenario 1, FR-017, FR-018, SC-006).
     - Invocar `run(...)` del `BootstrapAdminRunner` otra vez mantiene 1 `ADMIN` (Escenario 2, SC-007).
@@ -361,7 +361,7 @@ recursos.
 
 ### Implementation for User Story 5
 
-- [ ] T060 [US5] [CODE] Crear `BootstrapAdminRunner` (`ApplicationRunner`, `@Transactional`) en `src/main/java/com/mangateca/api/identity/application/BootstrapAdminRunner.java` con los pasos 1–5 de research R13:
+- [X] T060 [US5] [CODE] Crear `BootstrapAdminRunner` (`ApplicationRunner`, `@Transactional`) en `src/main/java/com/mangateca/api/identity/application/BootstrapAdminRunner.java` con los pasos 1–5 de research R13:
   1. Sin configuración → INFO.
   2. Configuración incompleta o inválida según `Email`/`PasswordPolicy` → WARN sin correo ni contraseña.
   3. `existsByRole(ADMIN)` → fin.
