@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 import com.mangateca.api.identity.Role;
 import com.mangateca.api.identity.application.AuthenticationService;
 import com.mangateca.api.identity.application.EmailAlreadyInUseException;
+import com.mangateca.api.identity.application.InvalidCredentialsException;
+import com.mangateca.api.identity.application.IssuedTokens;
 import com.mangateca.api.identity.application.RefreshTokenService;
 import com.mangateca.api.identity.config.IdentitySecurityConfiguration;
 import com.mangateca.api.identity.config.JwtKeyConfiguration;
@@ -47,6 +49,7 @@ import tools.jackson.databind.json.JsonMapper;
 class AuthControllerTests {
 
   private static final String REGISTER = "/api/v1/auth/register";
+  private static final String LOGIN = "/api/v1/auth/login";
   private static final String PASSWORD = "S3cret-pass-123";
   private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
@@ -123,6 +126,58 @@ class AuthControllerTests {
     assertThat(result).hasStatus(400);
     assertThat(errorFields(result)).contains("role");
     verifyNoInteractions(authenticationService);
+  }
+
+  @Test
+  @DisplayName("Escenario 1 / FR-007: login correcto responde 200 con access_token y cookie de refresh")
+  void shouldReturn200WithAccessTokenAndRefreshCookieWhenLoginIsValid() {
+    when(authenticationService.login("ana@example.com", PASSWORD))
+        .thenReturn(new IssuedTokens("access-jwt", 900L, "refresh-opaque"));
+
+    MvcTestResult result = login("{\"email\":\"ana@example.com\",\"password\":\"" + PASSWORD + "\"}");
+
+    assertThat(result).hasStatus(200);
+    JsonNode node = MAPPER.readTree(content(result));
+    assertThat(node.path("access_token").asString()).isEqualTo("access-jwt");
+    assertThat(node.path("token_type").asString()).isEqualTo("Bearer");
+    assertThat(node.path("expires_in").asInt()).isEqualTo(900);
+    assertThat(node.has("refresh_token")).isFalse();
+    assertThat(content(result)).doesNotContain("refresh-opaque");
+    List<String> cookies = result.getResponse().getHeaders("Set-Cookie");
+    assertThat(cookies).hasSize(1);
+    String cookie = cookies.get(0);
+    assertThat(cookie).startsWith("refresh_token=refresh-opaque;");
+    assertThat(cookie)
+        .contains("Path=/api/v1/auth", "Max-Age=604800", "HttpOnly", "Secure", "SameSite=Strict");
+  }
+
+  @Test
+  @DisplayName("FR-009 / FR-020: credenciales invalidas responden 401 con type invalid-credentials")
+  void shouldReturn401WhenCredentialsAreInvalid() {
+    when(authenticationService.login(any(), any())).thenThrow(new InvalidCredentialsException());
+
+    MvcTestResult result = login("{\"email\":\"ana@example.com\",\"password\":\"incorrecta\"}");
+
+    assertThat(result).hasStatus(401);
+    assertThat(result.getResponse().getContentType()).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+    JsonNode node = MAPPER.readTree(content(result));
+    assertThat(node.path("type").asString()).isEqualTo("urn:mangateca:problem:invalid-credentials");
+    assertThat(node.path("status").asInt()).isEqualTo(401);
+    assertThat(result.getResponse().getHeaders("Set-Cookie")).isEmpty();
+  }
+
+  @Test
+  @DisplayName("FR-009: login con cuerpo vacio responde 400 con errors y no llama al servicio")
+  void shouldReturn400WithErrorsWhenLoginBodyIsEmpty() {
+    MvcTestResult result = login("{}");
+
+    assertThat(result).hasStatus(400);
+    assertThat(errorFields(result)).contains("email", "password");
+    verifyNoInteractions(authenticationService);
+  }
+
+  private MvcTestResult login(String json) {
+    return mvc.post().uri(LOGIN).contentType(MediaType.APPLICATION_JSON).content(json).exchange();
   }
 
   private static String content(MvcTestResult result) {
