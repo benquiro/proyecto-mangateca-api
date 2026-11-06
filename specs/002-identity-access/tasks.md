@@ -168,25 +168,25 @@ con rol `CUSTOMER` y llega el evento.
 
 ### Tests for User Story 1 ⚠️
 
-- [ ] T021 [P] [US1] [TEST] Crear `UserRepositoryIT` en `src/test/java/com/mangateca/api/identity/domain/UserRepositoryIT.java` con `@DataJpaTest`, `@AutoConfigureTestDatabase(replace = NONE)` y `@Import(TestcontainersConfiguration.class)`. Guarda `ana@example.com` con `User.register` y verifica dos cosas:
+- [X] T021 [P] [US1] [TEST] Crear `UserRepositoryIT` en `src/test/java/com/mangateca/api/identity/domain/UserRepositoryIT.java` con `@DataJpaTest`, `@AutoConfigureTestDatabase(replace = NONE)` y `@Import(TestcontainersConfiguration.class)`. Guarda `ana@example.com` con `User.register` y verifica dos cosas:
   - `existsByEmail("ANA@Example.com")` es `true`.
   - Insertar con SQL nativo (`testEntityManager.getEntityManager().createNativeQuery(...)` y `flush`) otra fila con `ANA@EXAMPLE.COM`, sin pasar por `Email`, lanza una violación de unicidad (`PersistenceException`/`ConstraintViolationException`) del índice `users_email_lower_uk` de V2.
 
   Cubre US1 Escenario 2 y FR-002.
-- [ ] T022 [P] [US1] [TEST] Crear `AuthControllerTests` en `src/test/java/com/mangateca/api/identity/web/AuthControllerTests.java` con `@WebMvcTest(AuthController.class)` y `MockMvcTester`, importando con `@Import` `IdentitySecurityConfiguration`, `JwtKeyConfiguration` (registra `IdentityProperties`; perfil `test`), `UserMapperImpl` y `RefreshCookieFactory`, y con `@MockitoBean AuthenticationService` y `@MockitoBean RefreshTokenService`. El `GlobalExceptionHandler` lo incluye el slice. Casos:
+- [X] T022 [P] [US1] [TEST] Crear `AuthControllerTests` en `src/test/java/com/mangateca/api/identity/web/AuthControllerTests.java` con `@WebMvcTest(AuthController.class)` y `MockMvcTester`, importando con `@Import` `IdentitySecurityConfiguration`, `JwtKeyConfiguration` (registra `IdentityProperties`; perfil `test`), `UserMapperImpl` y `RefreshCookieFactory`, y con `@MockitoBean AuthenticationService` y `@MockitoBean RefreshTokenService`. El `GlobalExceptionHandler` lo incluye el slice. Casos:
   - Registro válido → 201 con `id`, `email`, `displayName` y `role=CUSTOMER`, sin campos `password` ni `passwordHash` (Escenario 1, FR-004, FR-005).
   - El servicio lanza `EmailAlreadyInUseException` → 409 `application/problem+json` con `type=urn:mangateca:problem:email-already-in-use` conservado por T019 (Escenario 2, FR-020).
   - `@ParameterizedTest` con los 5 ejemplos del Scenario Outline (contraseña de 7 y de 65 caracteres, correo inválido, nombre vacío, nombre de 101 caracteres) → 400 con `errors[].field` del campo afectado (Escenario 3, FR-001, FR-003).
   - `"role":"ADMIN"` → 400 con `errors[].field = role` y `verifyNoInteractions(authenticationService)` (Escenario 4, FR-005).
-- [ ] T023 [P] [US1] [TEST] Crear `UserRegisteredIT` en `src/test/java/com/mangateca/api/identity/UserRegisteredIT.java` con `@ApplicationModuleTest`, `@Import(TestcontainersConfiguration.class)` y `Scenario`: `scenario.stimulate(() -> authenticationService.register(...)).andWaitForEventOfType(UserRegistered.class).matching(e -> e.role() == Role.CUSTOMER).toArriveAndVerify(e -> assertThat(e.userId()).isNotNull())`. Sin inspeccionar `event_publication` (Escenario 1, FR-006, research R12).
-- [ ] T024 [US1] [TEST] Crear `AuthFlowIT` en `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` con `@SpringBootTest(RANDOM_PORT)`, `@AutoConfigureRestTestClient` e `@Import(TestcontainersConfiguration.class)`, y añadir el `@Nested Register`: registro de punta a punta → 201 y `role=CUSTOMER` sin contraseña en el cuerpo (flujo feliz de register; FR-001, FR-005).
+- [X] T023 [P] [US1] [TEST] Crear `UserRegisteredIT` en `src/test/java/com/mangateca/api/identity/UserRegisteredIT.java` con `@ApplicationModuleTest`, `@Import(TestcontainersConfiguration.class)` y `Scenario`: `scenario.stimulate(() -> authenticationService.register(...)).andWaitForEventOfType(UserRegistered.class).matching(e -> e.role() == Role.CUSTOMER).toArriveAndVerify(e -> assertThat(e.userId()).isNotNull())`. Sin inspeccionar `event_publication` (Escenario 1, FR-006, research R12).
+- [X] T024 [US1] [TEST] Crear `AuthFlowIT` en `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` con `@SpringBootTest(RANDOM_PORT)`, `@AutoConfigureRestTestClient` e `@Import(TestcontainersConfiguration.class)`, y añadir el `@Nested Register`: registro de punta a punta → 201 y `role=CUSTOMER` sin contraseña en el cuerpo (flujo feliz de register; FR-001, FR-005).
 
 ### Implementation for User Story 1
 
-- [ ] T025 [P] [US1] [CODE] Crear el record público `UserRegistered(UUID userId, Role role, Instant occurredAt)`, sin correo ni nombre, en `src/main/java/com/mangateca/api/identity/UserRegistered.java` (FR-006).
-- [ ] T026 [P] [US1] [CODE] Crear `PasswordPolicy` en `src/main/java/com/mangateca/api/identity/application/PasswordPolicy.java` y `src/main/java/com/mangateca/api/identity/application/package-info.java`. Es una clase final con `static boolean isValid(String)`: 8–64 caracteres (`codePointCount`) **y** ≤72 bytes UTF-8 (FR-003, research R5).
-- [ ] T027 [P] [US1] [CODE] Crear `EmailAlreadyInUseException extends ErrorResponseException` en `src/main/java/com/mangateca/api/identity/application/EmailAlreadyInUseException.java`. Construye un `ProblemDetail` 409 con `type=urn:mangateca:problem:email-already-in-use` y `detail` constante «El correo ya está en uso.», sin el correo (FR-002, FR-020, research R10, R14).
-- [ ] T028 [US1] [CODE] Crear `AuthenticationService` con `register(String email, String displayName, String password)` en `src/main/java/com/mangateca/api/identity/application/AuthenticationService.java`. Método `@Transactional` que:
+- [X] T025 [P] [US1] [CODE] Crear el record público `UserRegistered(UUID userId, Role role, Instant occurredAt)`, sin correo ni nombre, en `src/main/java/com/mangateca/api/identity/UserRegistered.java` (FR-006).
+- [X] T026 [P] [US1] [CODE] Crear `PasswordPolicy` en `src/main/java/com/mangateca/api/identity/application/PasswordPolicy.java` y `src/main/java/com/mangateca/api/identity/application/package-info.java`. Es una clase final con `static boolean isValid(String)`: 8–64 caracteres (`codePointCount`) **y** ≤72 bytes UTF-8 (FR-003, research R5).
+- [X] T027 [P] [US1] [CODE] Crear `EmailAlreadyInUseException extends ErrorResponseException` en `src/main/java/com/mangateca/api/identity/application/EmailAlreadyInUseException.java`. Construye un `ProblemDetail` 409 con `type=urn:mangateca:problem:email-already-in-use` y `detail` constante «El correo ya está en uso.», sin el correo (FR-002, FR-020, research R10, R14).
+- [X] T028 [US1] [CODE] Crear `AuthenticationService` con `register(String email, String displayName, String password)` en `src/main/java/com/mangateca/api/identity/application/AuthenticationService.java`. Método `@Transactional` que:
   1. Normaliza con `Email`.
   2. Lanza `EmailAlreadyInUseException` si `existsByEmail`.
   3. Codifica con `PasswordEncoder` y crea `User.register(..., Role.CUSTOMER, clock)`.
@@ -195,8 +195,8 @@ con rol `CUSTOMER` y llega el evento.
   6. Devuelve el `User`.
 
   Una `IllegalArgumentException` de `Email` o de `User.register` se traduce a `ErrorResponseException(BAD_REQUEST)`, nunca a 500. Depende de T025–T027 (FR-001, FR-002, FR-004, FR-005, FR-006, research R10, R11).
-- [ ] T029 [P] [US1] [CODE] Crear la restricción `@ValidPassword` y su validador (delegan en `PasswordPolicy`) en `src/main/java/com/mangateca/api/identity/web/ValidPassword.java`, `src/main/java/com/mangateca/api/identity/web/ValidPasswordValidator.java` y `src/main/java/com/mangateca/api/identity/web/package-info.java` (FR-003).
-- [ ] T030 [P] [US1] [CODE] Crear los records DTO `RegisterRequest` y `UserResponse` en `src/main/java/com/mangateca/api/identity/web/RegisterRequest.java` y `src/main/java/com/mangateca/api/identity/web/UserResponse.java`:
+- [X] T029 [P] [US1] [CODE] Crear la restricción `@ValidPassword` y su validador (delegan en `PasswordPolicy`) en `src/main/java/com/mangateca/api/identity/web/ValidPassword.java`, `src/main/java/com/mangateca/api/identity/web/ValidPasswordValidator.java` y `src/main/java/com/mangateca/api/identity/web/package-info.java` (FR-003).
+- [X] T030 [P] [US1] [CODE] Crear los records DTO `RegisterRequest` y `UserResponse` en `src/main/java/com/mangateca/api/identity/web/RegisterRequest.java` y `src/main/java/com/mangateca/api/identity/web/UserResponse.java`:
   - `RegisterRequest`:
     - El constructor compacto recorta (`strip()`) `email` y `displayName`, tolerando `null` para que Bean Validation lo reporte.
     - Campos: `email` (`@NotBlank @Email @Size(max = 254)`), `displayName` (`@NotBlank @Size(max = 100)`), `password` (`@ValidPassword`) y `role` (`@Nullable @Null`).
@@ -204,8 +204,8 @@ con rol `CUSTOMER` y llega el evento.
   - `UserResponse(UUID id, String email, String displayName, Role role)`.
 
   Cubre FR-001, FR-003, FR-005, FR-016 y el caso borde «correo con espacios».
-- [ ] T031 [P] [US1] [CODE] Crear el mapper MapStruct `UserMapper` (`componentModel = "spring"`, `User` → `UserResponse`) en `src/main/java/com/mangateca/api/identity/web/UserMapper.java` (Constitución IV).
-- [ ] T032 [US1] [CODE] Crear `AuthController` en `src/main/java/com/mangateca/api/identity/web/AuthController.java` con `@RequestMapping("/api/v1/auth")` y `POST /register` (`@Valid @RequestBody RegisterRequest`): llama a `AuthenticationService.register` y responde 201 con `UserMapper` (FR-001, FR-019).
+- [X] T031 [P] [US1] [CODE] Crear el mapper MapStruct `UserMapper` (`componentModel = "spring"`, `User` → `UserResponse`) en `src/main/java/com/mangateca/api/identity/web/UserMapper.java` (Constitución IV).
+- [X] T032 [US1] [CODE] Crear `AuthController` en `src/main/java/com/mangateca/api/identity/web/AuthController.java` con `@RequestMapping("/api/v1/auth")` y `POST /register` (`@Valid @RequestBody RegisterRequest`): llama a `AuthenticationService.register` y responde 201 con `UserMapper` (FR-001, FR-019).
 
 **Checkpoint**: `./mvnw verify` en verde, con T021–T024 más Foundational, `ModularityTests` y
 `ApiApplicationTests`.
