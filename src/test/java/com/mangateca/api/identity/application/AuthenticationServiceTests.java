@@ -15,16 +15,20 @@ import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.stream.Stream;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.ErrorResponseException;
 
 @ExtendWith(MockitoExtension.class)
 class AuthenticationServiceTests {
@@ -86,6 +90,46 @@ class AuthenticationServiceTests {
         .isInstanceOf(EmailAlreadyInUseException.class);
     verify(userRepository, never()).saveAndFlush(any(User.class));
     verify(eventPublisher, never()).publishEvent(any(UserRegistered.class));
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidPasswords")
+  @DisplayName("US1 / FR-003: contrasena invalida responde 400 sin efectos laterales")
+  void shouldThrow400WithoutSideEffectsWhenPasswordViolatesPolicy(String password) {
+    assertThatThrownBy(() -> service.register(EMAIL, "Ana", password))
+        .isInstanceOfSatisfying(
+            ErrorResponseException.class,
+            e -> {
+              assertThat(e.getStatusCode().value()).isEqualTo(400);
+              assertThat(e.getMessage()).doesNotContain(EMAIL);
+              assertThat(e.getBody().getDetail()).isNull();
+              if (password != null) {
+                assertThat(e.getMessage()).doesNotContain(password);
+              }
+            });
+    verifyNoInteractions(userRepository, passwordEncoder, eventPublisher);
+  }
+
+  static Stream<String> invalidPasswords() {
+    return Stream.of(
+        null,
+        "a".repeat(7),
+        "a".repeat(65),
+        "\u00f1".repeat(40)); // 40 caracteres pero 80 bytes UTF-8
+  }
+
+  @Test
+  @DisplayName("US1 / FR-003: contrasena valida (64 caracteres) sigue registrando y publica evento")
+  void shouldRegisterAndPublishEventWhenPasswordIsValid() {
+    String password = "a".repeat(64);
+    when(userRepository.existsByEmail(EMAIL)).thenReturn(false);
+    when(passwordEncoder.encode(password)).thenReturn("hash");
+    when(userRepository.saveAndFlush(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+    User user = service.register(EMAIL, "Ana", password);
+
+    assertThat(user.getEmail()).isEqualTo(EMAIL);
+    verify(eventPublisher).publishEvent(any(UserRegistered.class));
   }
 
   private static DataIntegrityViolationException integrityViolation(String constraint) {

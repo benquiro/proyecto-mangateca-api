@@ -39,6 +39,10 @@ public class AuthenticationService {
   /** Registra una cuenta nueva siempre con rol CUSTOMER. */
   @Transactional
   public User register(String email, String displayName, String password) {
+    if (!PasswordPolicy.isValid(password)) {
+      // defensa en profundidad: sin mensaje ni causa para no filtrar datos del cliente
+      throw new ErrorResponseException(HttpStatus.BAD_REQUEST);
+    }
     User user;
     try {
       Email normalized = new Email(email);
