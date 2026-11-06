@@ -66,3 +66,5 @@ out/
 *.key
 hs_err_pid*
 replay_pid*
+# Cookie jar de curl (contiene refresh tokens)
+jar.txt
