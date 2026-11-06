@@ -65,21 +65,22 @@ class FlywayMigrationIT {
 	}
 
 	@Test
-	@DisplayName("FR-006: sin tablas de negocio ajenas a plataforma e identidad (V2) en el esquema public")
+	@DisplayName("FR-006: sin tablas de negocio ajenas a plataforma, identidad (V2) y catalogo (V3) en el esquema public")
 	void shouldNotCreateBusinessTables() {
 		List<String> tables = jdbc.queryForList(
 				"SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'", String.class);
 
 		assertThat(tables).containsExactlyInAnyOrder("flyway_schema_history", "event_publication", "users",
-				"refresh_tokens");
+				"refresh_tokens", "products", "authors", "publishers", "genres", "series", "product_authors",
+				"product_genres");
 	}
 
 	@Test
-	@DisplayName("FR-006 / R3: solo la extension plpgsql")
-	void shouldNotCreateExtensions() {
+	@DisplayName("FR-006 / R3: solo plpgsql y las extensiones de V3")
+	void shouldOnlyCreatePlpgsqlAndV3Extensions() {
 		List<String> extensions = jdbc.queryForList("SELECT extname FROM pg_extension", String.class);
 
-		assertThat(extensions).containsExactly("plpgsql");
+		assertThat(extensions).containsExactlyInAnyOrder("plpgsql", "unaccent", "pg_trgm");
 	}
 
 }
