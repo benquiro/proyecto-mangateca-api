@@ -29,6 +29,8 @@ La plataforma base (feature 001) y la identidad de usuarios (feature 002) ya exi
 
 ## User Scenarios & Testing *(mandatory)*
 
+> **Tests**: cada escenario de aceptación de esta sección MUST tener un test automatizado. Es la petición explícita que la Constitución VI exige para generar tests más allá de los obligatorios.
+
 ### User Story 1 - Explorar el catálogo (Priority: P1)
 
 Como visitante, quiero ver el catálogo paginado y ordenado, para recorrer lo que vende la tienda.
@@ -272,9 +274,9 @@ Scenario: Mismo catálogo para todos los roles
 **Listado y paginación**
 
 - **FR-001**: El listado de productos MUST ser público y siempre paginado. El tamaño de página por defecto MUST ser 20 y el máximo 100; un tamaño mayor MUST rechazarse con error de validación.
-- **FR-002**: El listado MUST poder ordenarse por título, precio, fecha de publicación y fecha de incorporación al catálogo (novedades), en ambos sentidos. Sin orden explícito, MUST mostrar primero las novedades. El orden MUST ser estable entre productos con el mismo valor.
+- **FR-002**: El listado MUST poder ordenarse por título, precio, fecha de publicación y fecha de incorporación al catálogo (novedades), en ambos sentidos. Sin orden explícito, MUST mostrar primero las novedades. Si se indica el criterio sin sentido, el sentido es ascendente. El orden MUST ser estable entre productos con el mismo valor.
 - **FR-003**: Cada elemento del listado MUST mostrar lo necesario para una tarjeta de producto: identificador, título, tipo (manga, libro o cómic), autores, precio, portada y, si pertenece a una serie, su nombre y número de volumen.
-- **FR-004**: Una página fuera de rango MUST devolver una página vacía con los metadatos de paginación, no un error.
+- **FR-004**: Una página fuera de rango MUST devolver una página vacía con los metadatos de paginación, no un error. El número de página admite como máximo 1.000.000; un valor mayor es un parámetro inválido (FR-008), no una página fuera de rango.
 
 **Búsqueda y filtros**
 
@@ -337,6 +339,9 @@ Scenario: Mismo catálogo para todos los roles
 - Un producto pertenece como máximo a una serie (confirmado).
 - El idioma es un dato informativo del producto, no un filtro (confirmado).
 - No se aplica limitación de tasa a los endpoints públicos en esta feature.
+- Las reglas de dominio que se comprueban al crear o editar un producto, en particular FR-019 (≥ 1 autor y ≥ 1 género), se aplican en la feature 004, que es la única que escribe en el catálogo. Esta feature solo lee; la base de datos protege lo que puede expresarse con restricciones (tipo, precio, ISBN, serie y volumen).
+- Los endpoints de lectura aceptan `GET` y `HEAD` (y `OPTIONS` para CORS) sin credenciales.
+- La comprobación de SC-003 contra el JSON actual del frontend se hace al migrar esos datos (feature 012).
 - Un producto tiene exactamente una editorial.
 - La portada es una URL; la subida y el almacenamiento de imágenes quedan fuera de alcance.
 - Los datos del catálogo (productos y clasificaciones) se cargan fuera de esta feature: la administración llega con la feature 004 y los datos de ejemplo con la 012. Esta feature solo lee.

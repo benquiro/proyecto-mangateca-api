@@ -20,6 +20,9 @@ info:
       `totalElements`, `totalPages`). Una pagina fuera de rango devuelve `content` vacio.
     - Los errores son `application/problem+json` (RFC 9457).
     - Se ignora cualquier `Authorization` en estas rutas: el catalogo es identico para todos.
+    - Cada operacion GET acepta tambien HEAD sin credenciales (mismas cabeceras, sin cuerpo).
+      Cualquier otro metodo sobre estas rutas responde 401 sin token.
+    - `sort` sin sentido (`sort=price`) es ascendente.
 servers:
   - url: http://localhost:8080
 tags:

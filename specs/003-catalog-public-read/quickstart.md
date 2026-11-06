@@ -18,7 +18,8 @@ Contrato HTTP: [contracts/openapi.yaml](contracts/openapi.yaml). Esquema e índi
 
 Esperado: compila sin advertencias y pasan los tests de 001 y 002 más los de `catalog`:
 `MoneyTests`, `IsbnTests`, `ProductSearchIT`, `ClassificationRepositoryIT`,
-`ProductQueryServiceIT`, `ProductControllerTests`, `SeriesControllerTests`,
+`CatalogConstraintsIT`, `ProductQueryServiceIT`, `ClassificationQueryServiceIT`,
+`ProductControllerTests`, `SeriesControllerTests`,
 `ClassificationControllerTests`, `CatalogSecurityIT` y `ModularityTests` (ver «Testing» en
 [plan.md](plan.md)).
 
@@ -94,7 +95,10 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST   $BASE/products -H 'Content-Ty
 curl -s -o /dev/null -w '%{http_code}\n' -X PUT    $BASE/products/<id>
 curl -s -o /dev/null -w '%{http_code}\n' -X DELETE $BASE/products/<id>
 
-# 5b. Un token inválido en un GET público no rompe la respuesta (se ignora) → 200
+# 5b. HEAD anónimo también es lectura → 200 sin cuerpo
+curl -s -o /dev/null -w '%{http_code}\n' -I "$BASE/products"
+
+# 5c. Un token inválido en un GET público no rompe la respuesta (se ignora) → 200
 curl -s -o /dev/null -w '%{http_code}\n' "$BASE/products" -H 'Authorization: Bearer basura'
 ```
 

@@ -127,7 +127,9 @@ documentación consultada no cierra se marca **«verificar en implementación»*
   - `PageParams` (record, `@ParameterObject` para springdoc) enlaza `page` (`@Min(0)`,
     `@Max(1_000_000)`, defecto 0) y `size` (`@Min(1)`, `@Max(100)`, defecto 20). Los valores
     por defecto se aplican en el constructor compacto (los campos son `Integer` que llegan
-    `null` si se omiten). La constante 100 vive en un único sitio.
+    `null` si se omiten). Los límites viven en un único sitio: las constantes
+    `PageParams.MAX_SIZE = 100` y `PageParams.MAX_PAGE = 1_000_000`, que `ProductSearchRequest`
+    reutiliza en sus propias anotaciones `@Max` (son constantes de compilación).
   - El controlador construye `PageRequest.of(page, size, sort)`.
   - La respuesta es `PagedModel<T>` (`org.springframework.data.web.PagedModel`) creado
     explícitamente con `new PagedModel<>(page.map(mapper::…))`: JSON `{ "content": […],
@@ -147,7 +149,8 @@ documentación consultada no cierra se marca **«verificar en implementación»*
 - **Decision**: `ProductSearchRequest.sort` es un único `String` (`clave[,asc|desc]`) validado
   con `@Pattern("^(title|price|publicationDate|createdAt)(,(asc|desc))?$")`. Un mapa explícito
   `clave de API → propiedad de la entidad` produce el `Sort`. Hoy los nombres coinciden, pero el
-  mapa evita acoplar el contrato a los atributos internos. Por defecto: `createdAt,desc`.
+  mapa evita acoplar el contrato a los atributos internos. Por defecto: `createdAt,desc`. Una
+  clave sin sentido (`sort=price`) es ascendente (FR-002).
   Cualquier otra clave → 400 con `field = sort`.
 - **Desempate**: se añade siempre `id` **en el mismo sentido** que el criterio principal. Un
   orden total hace estable la paginación (Edge Cases) y, al coincidir los sentidos, un índice
@@ -208,11 +211,13 @@ documentación consultada no cierra se marca **«verificar en implementación»*
 ## R8. Seguridad: cadena propia de `catalog`
 
 - **Decision**: `catalog.config.CatalogSecurityConfiguration` define un `SecurityFilterChain`
-  `@Order(2)` con `securityMatcher` solo para `GET` y `OPTIONS` sobre **rutas exactas**:
+  `@Order(2)` con `securityMatcher` solo para `GET`, `HEAD` y `OPTIONS` sobre **rutas exactas**:
   `/api/v1/products`, `/api/v1/products/*`, `/api/v1/series`, `/api/v1/series/*`,
   `/api/v1/series/*/volumes`, `/api/v1/genres`, `/api/v1/authors`, `/api/v1/publishers`;
   `permitAll`, sin sesión, CSRF deshabilitado y CORS por defecto. Es el patrón de
   `IdentitySecurityConfiguration` (`@Order(1)`).
+- `HEAD` se incluye porque Spring MVC lo atiende con el mismo `@GetMapping` y es lectura: sin él,
+  un `HEAD` anónimo a un recurso público respondería 401 (Assumptions de la spec).
 - Cualquier otro método (`POST`, `PUT`, `PATCH`, `DELETE`) sobre esas rutas no coincide con el
   `securityMatcher`, cae en la cadena por defecto de `platform` (`anyRequest().authenticated()`)
   y responde 401 sin token. Las rutas exactas (no `/products/**`) evitan abrir sin querer
@@ -257,6 +262,20 @@ documentación consultada no cierra se marca **«verificar en implementación»*
   `CatalogTestData` (`JdbcClient`) en `src/test`. Se inserta por SQL, no mediante entidades,
   porque la feature 003 no tiene fábricas de `Product` (R14) y así los tests no dependen de la
   escritura que construirá la 004.
+- **Entidades en `@WebMvcTest`**: el servicio mockeado debe devolver entidades reales (VI prohíbe
+  mockearlas), pero no tienen fábrica pública. `CatalogFixtures` (solo `src/test`) las crea por el
+  constructor `protected` con `BeanUtils.instantiateClass` y asigna los campos con
+  `ReflectionTestUtils.setField`. **Alternativa descartada**: añadir constructores o setters
+  públicos a producción solo para tests (abre una vía de escritura que esquiva las invariantes
+  que la 004 pondrá en la fábrica); **otra descartada**: probar los controladores con
+  `@SpringBootTest` y BD real (más lento y mezcla web con persistencia).
+- **Carga perezosa fuera de la transacción**: `@DataJpaTest` envuelve cada test en una transacción,
+  de modo que la carga perezosa funcionaría siempre y ocultaría un grafo incompleto. El test que lo
+  comprueba se marca `@Transactional(propagation = Propagation.NOT_SUPPORTED)` y limpia con
+  `CatalogTestData.clear()`.
+- **SQL del paso 1**: las estadísticas de Hibernate cuentan sentencias, no muestran columnas. Para
+  comprobar que el paso 1 selecciona solo `id` se activa `logging.level.org.hibernate.SQL=DEBUG`
+  en ese test y se inspecciona la salida con `OutputCaptureExtension`.
 - Búsqueda, filtros combinados, clasificaciones y conteo de sentencias usan `@DataJpaTest` o
   `@SpringBootTest` con Testcontainers PostgreSQL vía `@ServiceConnection`, porque dependen de
   `unaccent` y `pg_trgm` reales.
@@ -298,15 +317,17 @@ documentación consultada no cierra se marca **«verificar en implementación»*
 
 - **Decision**: `page` ≤ 1.000.000 (`@Max`). Con `size` ≤ 100 el desplazamiento máximo es
   10⁸, dentro de `int`; sin tope, `page × size` desbordaría el `setFirstResult(int)` de JPA y
-  produciría un 500. Una página mayor se rechaza con 400 en lugar de devolver una página vacía:
-  desviación mínima y deliberada de FR-004 («página fuera de rango = vacía») para valores que
-  ningún catálogo alcanza.
+  produciría un 500. Una página mayor se rechaza con 400 en lugar de devolver una página vacía.
+  FR-004 recoge ahora este tope de forma explícita: un valor mayor es un parámetro inválido
+  (FR-008), no una página fuera de rango.
 
 ## R14. Límites de la integridad solo con SQL
 
 - La restricción «≥ 1 autor y ≥ 1 género» no se expresa con un `CHECK` de PostgreSQL (necesita
   mirar otra tabla); un *trigger* diferido sería complejidad sin evidencia (VII). Se garantiza
-  en la fábrica de `Product` que añade la feature 004, que es la única que crea productos. En
+  en la fábrica de `Product` que añade la feature 004, que es la única que crea productos (la
+  spec lo recoge en Assumptions). Las restricciones que sí están en V3 tienen test propio
+  (`CatalogConstraintsIT`). En
   003 el módulo es de solo lectura: las entidades llevan constructor `protected` sin fábrica
   pública. Los CHECK de tipo, estado, precio, ISBN y coherencia serie/volumen y las `UNIQUE`
   sí están en V3.

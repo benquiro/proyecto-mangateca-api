@@ -94,8 +94,8 @@ decimales.
 | IV | Todo listado paginado con tamaño máximo | Los 6 listados: defecto 20, máximo 100, rechazo con 400 | ✅ |
 | IV | JSpecify; `Optional` en resultados únicos | `@NullMarked` en cada `package-info.java`; repositorios con `Optional<T>`; colecciones nunca `null` | ✅ |
 | V | Autenticación JWT nativa | Sin cambios; los endpoints de `catalog` no leen la identidad | ✅ |
-| V | `SecurityFilterChain` deny-by-default | La cadena de plataforma no cambia. `catalog` añade una cadena `@Order(2)` limitada a `GET`/`OPTIONS` sobre las rutas exactas; `POST`/`PUT`/`DELETE` caen en la cadena por defecto y se rechazan | ✅ |
-| V | Acceso anónimo limitado a lectura de catálogo y a los 4 `POST /auth/*` | Solo `GET` sobre las 8 rutas de lectura del catálogo | ✅ |
+| V | `SecurityFilterChain` deny-by-default | La cadena de plataforma no cambia. `catalog` añade una cadena `@Order(2)` limitada a `GET`/`HEAD`/`OPTIONS` sobre las rutas exactas; `POST`/`PUT`/`DELETE` caen en la cadena por defecto y se rechazan | ✅ |
+| V | Acceso anónimo limitado a lectura de catálogo y a los 4 `POST /auth/*` | Solo `GET`/`HEAD` sobre las 8 rutas de lectura del catálogo | ✅ |
 | V | Anti IDOR; identidad del token | N/A: el catálogo es idéntico para todos los roles; no hay recursos por usuario | — |
 | VI | Solo tests vitales; tests obligatorios 1–4 | Ver sección Testing: invariantes de `Money`/`Isbn`, seguridad, `verify()`, y flujo feliz de los endpoints | ✅ |
 | VI | Testcontainers vía `@ServiceConnection`; sin H2 | `TestcontainersConfiguration` de 001; la búsqueda depende de `unaccent`/`pg_trgm` reales | ✅ |
@@ -110,7 +110,9 @@ decimales.
 **Resultado pre-Phase 0**: PASS, sin violaciones.
 
 **Resultado post-Phase 1** (re-evaluado tras data-model y contracts): PASS. El diseño no añade
-interfaces, dependencias, caché ni rutas anónimas fuera de `GET` sobre el catálogo.
+interfaces, dependencias, caché ni rutas anónimas fuera de `GET`/`HEAD` sobre el catálogo. Tras
+`/speckit-analyze`: FR-019 queda asignado a la feature 004 en la spec (Assumptions), el tope de
+`page` está en FR-004 y la petición de tests por escenario está en la spec (VI).
 
 ## Evaluación de trade-offs (Principio VII)
 
@@ -179,17 +181,17 @@ src/main/java/com/mangateca/api/catalog/
 │   ├── NamedResponse.java  SeriesResponse.java
 │   └── package-info.java
 └── config/
-    ├── CatalogSecurityConfiguration.java  # cadena @Order(2): GET/OPTIONS públicos
+    ├── CatalogSecurityConfiguration.java  # cadena @Order(2): GET/HEAD/OPTIONS públicos
     └── package-info.java
 
 src/main/resources/db/migration/V3__create_catalog.sql
 
 src/test/java/com/mangateca/api/catalog/
-├── domain/   MoneyTests, IsbnTests, ProductSearchIT, ClassificationRepositoryIT
-├── application/ ProductQueryServiceIT (sentencias SQL, orden, página fuera de rango)
+├── domain/   MoneyTests, IsbnTests, ProductSearchIT, ClassificationRepositoryIT, CatalogConstraintsIT
+├── application/ ProductQueryServiceIT, ClassificationQueryServiceIT
 ├── web/      ProductControllerTests, SeriesControllerTests, ClassificationControllerTests
+├── support/  CatalogTestData (inserta por JDBC), CatalogFixtures (entidades en memoria)
 └── CatalogSecurityIT
-src/test/java/com/mangateca/api/catalog/support/CatalogTestData.java   # builder (solo src/test)
 src/test/resources/catalog/*.sql                                       # datos de prueba
 ```
 
@@ -215,7 +217,7 @@ lo trata como módulo sin API pública. No se crean fachadas ni interfaces (Prin
 | US1 listado sin parámetros: 20 publicados, novedades primero, metadatos | `ProductQueryServiceIT` | `@DataJpaTest`-style + servicio |
 | US1 tamaño 101 → 400 con parámetro | `ProductControllerTests` | `@WebMvcTest` |
 | US1 página fuera de rango → vacía, sin error | `ProductQueryServiceIT` | servicio |
-| US1 ordenamiento explícito (4 criterios) | `ProductQueryServiceIT` (parametrizado) | servicio |
+| US1 ordenamiento explícito (4 criterios) | `ProductQueryServiceIT` (parametrizado, orden real en BD) + `ProductControllerTests` (traducción clave de API → `Sort`, sentido por defecto y desempate) | servicio + `@WebMvcTest` |
 | US1 tarjeta con serie / sin serie | `ProductControllerTests` (JSON de tarjeta) | `@WebMvcTest` |
 | US2 sin mayúsculas ni tildes, autor, ISBN (con y sin guiones), varias palabras, parcial | `ProductSearchIT` | `@DataJpaTest` + Testcontainers |
 | US2 filtros combinados (tipo + género + precio); búsqueda + filtros + orden + 2.ª página | `ProductSearchIT` | `@DataJpaTest` + Testcontainers |
@@ -224,12 +226,13 @@ lo trata como módulo sin API pública. No se crean fachadas ni interfaces (Prin
 | US3 detalle publicado, con serie | `ProductControllerTests` | `@WebMvcTest` |
 | US3 no publicado ≡ inexistente (cuerpos idénticos); UUID mal formado → 400 | `ProductControllerTests` + `ProductQueryServiceIT` (el no publicado lanza la misma excepción) | mixto |
 | US4 serie con volumen 2 oculto → 1 y 3 en orden | `ProductQueryServiceIT` | servicio |
-| US4 serie inexistente o sin publicados → 404 (detalle y volúmenes) | `SeriesControllerTests` + `ProductQueryServiceIT` | mixto |
+| US4 serie inexistente o sin publicados → 404 (detalle y volúmenes) | `SeriesControllerTests` + `ProductQueryServiceIT` + `ClassificationQueryServiceIT` | mixto |
 | US4 llegar a la serie desde el volumen | `ProductControllerTests` (el detalle trae `series.id`) | `@WebMvcTest` |
 | US5 género sin publicados no aparece; autor con solo no publicados no aparece; orden alfabético; 4 clasificaciones | `ClassificationRepositoryIT` | `@DataJpaTest` + Testcontainers |
 | US6 acceso sin token; mismo catálogo para CUSTOMER y ADMIN | `CatalogSecurityIT` | `@SpringBootTest` |
 | Edge: producto con varios autores no se duplica; texto vacío = sin búsqueda; ID de clasificación inexistente → vacía; orden estable | `ProductSearchIT` | `@DataJpaTest` |
 | Sin N+1 (IV) | `ProductQueryServiceIT`: estadísticas de Hibernate, número de sentencias constante para páginas de 1 y de 20 | servicio |
+| Restricciones de V3 (FR-015..FR-018) | `CatalogConstraintsIT`: ISBN duplicado, volumen duplicado en la serie, serie sin volumen y volumen sin serie, tipo inválido, precio ≤ 0 → violación de restricción | `@DataJpaTest` + Testcontainers |
 
 ### Mocks y dobles permitidos
 
@@ -238,9 +241,15 @@ real de Testcontainers. Las entidades, `Money` e `Isbn` nunca se mockean.
 
 ### Datos de prueba
 
-Solo en `src/test`: scripts SQL (`src/test/resources/catalog/*.sql`) y un builder
-`CatalogTestData` que inserta con `JdbcClient`. **Ningún dato de ejemplo en las migraciones**
-(los datos de desarrollo llegan con la feature 012).
+Solo en `src/test`. **Ningún dato de ejemplo en las migraciones** (los datos de desarrollo llegan
+con la feature 012).
+
+- **Tests con BD**: scripts SQL (`src/test/resources/catalog/*.sql`) y el builder
+  `CatalogTestData`, que inserta con `JdbcClient`.
+- **Tests `@WebMvcTest`**: el servicio mockeado devuelve entidades reales, no mocks (VI). Como en
+  003 las entidades no tienen fábrica pública (R14), `CatalogFixtures` las construye en memoria:
+  instancia por el constructor `protected` y asigna los campos con `ReflectionTestUtils`. Es
+  código solo de test y no añade setters ni constructores a producción.
 
 ### Fuera de los tests automatizados
 
@@ -260,6 +269,10 @@ El criterio de rendimiento (p95 < 500 ms con 10.000 productos) se verifica a man
   (`@SecurityRequirements`), porque `OpenApiConfiguration` aplica `bearerAuth` globalmente.
 - **Migraciones**: V1 y V2 no se tocan.
 - **`spring.data.web.pageable.*`**: no se configura (R4).
+- **`FlywayMigrationIT`**: su aserción de la lista exacta de tablas se amplía con las siete tablas
+  de V3.
+- **`README.md`**: sección breve «Catálogo público» (rutas, paginación y extensiones
+  `unaccent`/`pg_trgm` con el privilegio que requieren, R2).
 
 ## Orden de implementación (guía para `/speckit-tasks`)
 
