@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 import com.mangateca.api.identity.Role;
 import com.mangateca.api.identity.application.AuthenticationService;
@@ -17,6 +18,10 @@ import com.mangateca.api.identity.config.IdentitySecurityConfiguration;
 import com.mangateca.api.identity.config.JwtKeyConfiguration;
 import com.mangateca.api.identity.domain.Email;
 import com.mangateca.api.identity.domain.User;
+import com.mangateca.api.platform.security.ProblemDetailsAccessDeniedHandler;
+import com.mangateca.api.platform.security.ProblemDetailsAuthenticationEntryPoint;
+import com.mangateca.api.platform.security.ProblemDetailsResponseWriter;
+import com.mangateca.api.platform.security.SecurityConfiguration;
 import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -24,12 +29,15 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -47,7 +55,11 @@ import tools.jackson.databind.json.JsonMapper;
   IdentitySecurityConfiguration.class,
   JwtKeyConfiguration.class,
   UserMapperImpl.class,
-  RefreshCookieFactory.class
+  RefreshCookieFactory.class,
+  SecurityConfiguration.class,
+  ProblemDetailsResponseWriter.class,
+  ProblemDetailsAuthenticationEntryPoint.class,
+  ProblemDetailsAccessDeniedHandler.class
 })
 class AuthControllerTests {
 
@@ -55,6 +67,7 @@ class AuthControllerTests {
   private static final String LOGIN = "/api/v1/auth/login";
   private static final String REFRESH = "/api/v1/auth/refresh";
   private static final String LOGOUT = "/api/v1/auth/logout";
+  private static final String ME = "/api/v1/auth/me";
   private static final String PASSWORD = "S3cret-pass-123";
   private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
@@ -255,6 +268,60 @@ class AuthControllerTests {
     assertThat(result).hasStatus(204);
     verify(refreshTokenService).revoke("live-opaque");
     assertThat(result.getResponse().getHeaders("Set-Cookie").get(0)).contains("Max-Age=0");
+  }
+
+  @Test
+  @DisplayName("Escenario 1 / FR-016: /me con JWT responde 200 con el UserResponse y sin campos sensibles")
+  void shouldReturn200WithOwnUserResponseWhenMeHasJwt() {
+    Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
+    User user =
+        User.register(new Email("ana@example.com"), "Ana", "{bcrypt}hash-secreto", Role.CUSTOMER, clock);
+    when(authenticationService.me(user.getId())).thenReturn(Optional.of(user));
+
+    MvcTestResult result =
+        mvc.get().uri(ME).with(jwt().jwt(j -> j.subject(user.getId().toString()))).exchange();
+
+    assertThat(result).hasStatus(200);
+    String json = content(result);
+    JsonNode node = MAPPER.readTree(json);
+    assertThat(node.path("id").asString()).isEqualTo(user.getId().toString());
+    assertThat(node.path("email").asString()).isEqualTo("ana@example.com");
+    assertThat(node.path("displayName").asString()).isEqualTo("Ana");
+    assertThat(node.path("role").asString()).isEqualTo("CUSTOMER");
+    assertThat(node.propertyNames()).containsExactlyInAnyOrder("id", "email", "displayName", "role");
+    assertThat(json).doesNotContain("hash-secreto");
+    verify(authenticationService).me(user.getId());
+  }
+
+  @Test
+  @DisplayName("FR-016: /me con JWT valido de usuario inexistente o deshabilitado responde 401 con WWW-Authenticate")
+  void shouldReturn401WhenMeUserIsNotFound() {
+    UUID id = UUID.randomUUID();
+    when(authenticationService.me(id)).thenReturn(Optional.empty());
+
+    MvcTestResult result = mvc.get().uri(ME).with(jwt().jwt(j -> j.subject(id.toString()))).exchange();
+
+    assertUnauthorizedProblem(result);
+  }
+
+  @ParameterizedTest(name = "sub = {0}")
+  @ValueSource(strings = {"no-es-uuid", "123", " "})
+  @DisplayName("FR-016: /me con sub que no es UUID responde 401 y no consulta al servicio")
+  void shouldReturn401WhenMeSubjectIsNotUuid(String subject) {
+    MvcTestResult result = mvc.get().uri(ME).with(jwt().jwt(j -> j.subject(subject))).exchange();
+
+    assertUnauthorizedProblem(result);
+    verifyNoInteractions(authenticationService);
+  }
+
+  private static void assertUnauthorizedProblem(MvcTestResult result) {
+    assertThat(result).hasStatus(401);
+    assertThat(result.getResponse().getContentType()).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+    JsonNode node = MAPPER.readTree(content(result));
+    assertThat(node.path("type").asString()).isEqualTo("about:blank");
+    assertThat(node.path("status").asInt()).isEqualTo(401);
+    assertThat(node.path("detail").asString()).isEqualTo("Se requiere autenticación válida.");
+    assertThat(result.getResponse().getHeader("WWW-Authenticate")).isEqualTo("Bearer");
   }
 
   private MvcTestResult login(String json) {

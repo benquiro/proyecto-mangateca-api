@@ -7,11 +7,17 @@ import com.mangateca.api.identity.application.RefreshTokenService;
 import com.mangateca.api.identity.domain.User;
 import jakarta.validation.Valid;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,6 +42,31 @@ public class AuthController {
     this.userMapper = userMapper;
     this.refreshCookieFactory = refreshCookieFactory;
     this.refreshTokenService = refreshTokenService;
+  }
+
+  @GetMapping("/me")
+  public UserResponse me(@AuthenticationPrincipal Jwt jwt) {
+    return currentUserId(jwt)
+        .flatMap(authenticationService::me)
+        .map(userMapper::toResponse)
+        .orElseThrow(AuthController::unauthorized);
+  }
+
+  private static Optional<UUID> currentUserId(@Nullable Jwt jwt) {
+    if (jwt == null || jwt.getSubject() == null) {
+      return Optional.empty();
+    }
+    try {
+      return Optional.of(UUID.fromString(jwt.getSubject()));
+    } catch (IllegalArgumentException e) {
+      return Optional.empty();
+    }
+  }
+
+  private static ErrorResponseException unauthorized() {
+    ErrorResponseException ex = new ErrorResponseException(HttpStatus.UNAUTHORIZED);
+    ex.getHeaders().set(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+    return ex;
   }
 
   @PostMapping("/register")

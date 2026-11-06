@@ -2,8 +2,12 @@ package com.mangateca.api.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.mangateca.api.TestSecurityConfiguration;
+import com.mangateca.api.TestSecurityConfiguration.TestTokens;
 import com.mangateca.api.TestcontainersConfiguration;
+import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -21,12 +25,14 @@ import tools.jackson.databind.node.ObjectNode;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, TestSecurityConfiguration.class})
 class AuthFlowIT {
 
   private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
   @Autowired private RestTestClient client;
+
+  @Autowired private TestTokens testTokens;
 
   @Nested
   class Register {
@@ -208,6 +214,179 @@ class AuthFlowIT {
 
       EntityExchangeResult<String> afterLogout = postWithCookie("/api/v1/auth/refresh", second);
       assertThat(afterLogout.getStatus().value()).isEqualTo(401);
+    }
+  }
+
+  private static String accessToken(EntityExchangeResult<String> loginResult) {
+    return MAPPER.readTree(loginResult.getResponseBody()).path("access_token").asString();
+  }
+
+  private EntityExchangeResult<String> getWithBearer(String uri, String token) {
+    return client.get().uri(uri).header("Authorization", "Bearer " + token).exchange().returnResult(String.class);
+  }
+
+  @Nested
+  class Me {
+
+    @Test
+    @DisplayName("Escenario 1 / FR-016: cada token obtiene en /me solo sus propios datos (anti IDOR)")
+    void shouldReturnOnlyOwnIdentityForEachToken() {
+      String password = "S3cret-pass-123";
+      String emailA = uniqueEmail();
+      String emailB = uniqueEmail();
+      String idA = register(emailA, password).path("id").asString();
+      String idB = register(emailB, password).path("id").asString();
+      String tokenA = accessToken(login(emailA, password));
+      String tokenB = accessToken(login(emailB, password));
+
+      EntityExchangeResult<String> meA = getWithBearer("/api/v1/auth/me", tokenA);
+      EntityExchangeResult<String> meB = getWithBearer("/api/v1/auth/me", tokenB);
+
+      assertThat(meA.getStatus().value()).isEqualTo(200);
+      assertThat(meB.getStatus().value()).isEqualTo(200);
+      JsonNode a = MAPPER.readTree(meA.getResponseBody());
+      JsonNode b = MAPPER.readTree(meB.getResponseBody());
+      assertThat(a.path("id").asString()).isEqualTo(idA);
+      assertThat(a.path("email").asString()).isEqualTo(emailA);
+      assertThat(a.path("displayName").asString()).isEqualTo("Flow");
+      assertThat(a.path("role").asString()).isEqualTo("CUSTOMER");
+      assertThat(b.path("id").asString()).isEqualTo(idB);
+      assertThat(b.path("email").asString()).isEqualTo(emailB);
+      assertThat(meA.getResponseBody()).doesNotContain(idB, emailB);
+      assertThat(meB.getResponseBody()).doesNotContain(idA, emailA);
+      for (JsonNode node : List.of(a, b)) {
+        assertThat(node.has("password")).isFalse();
+        assertThat(node.has("passwordHash")).isFalse();
+      }
+      assertThat(meA.getResponseBody()).doesNotContainIgnoringCase("password");
+    }
+
+    @Test
+    @DisplayName("Escenario 2 / FR-016: token expirado en /me responde 401 ProblemDetail")
+    void shouldReturn401ProblemWhenTokenIsExpired() {
+      String email = uniqueEmail();
+      String userId = register(email, "S3cret-pass-123").path("id").asString();
+      Instant issuedAt = Instant.parse("2020-01-01T00:00:00Z");
+      String expired = testTokens.token(userId, List.of("CUSTOMER"), issuedAt, issuedAt.plusSeconds(900));
+
+      EntityExchangeResult<String> result = getWithBearer("/api/v1/auth/me", expired);
+
+      assertThat(result.getStatus().value()).isEqualTo(401);
+      assertThat(result.getResponseHeaders().getContentType())
+          .isNotNull()
+          .hasToString("application/problem+json");
+      JsonNode node = MAPPER.readTree(result.getResponseBody());
+      assertThat(node.path("status").asInt()).isEqualTo(401);
+      assertThat(node.path("type").asString()).isEqualTo("about:blank");
+      assertThat(result.getResponseHeaders().getFirst("WWW-Authenticate")).startsWith("Bearer");
+      assertThat(result.getResponseBody()).doesNotContain(userId);
+    }
+
+    @Test
+    @DisplayName("Escenario 2 / FR-016: token valido de un usuario inexistente en /me responde 401 ProblemDetail")
+    void shouldReturn401ProblemWhenTokenSubjectDoesNotExist() {
+      String unknownId = UUID.randomUUID().toString();
+      String token = testTokens.token(unknownId, List.of("CUSTOMER"));
+
+      EntityExchangeResult<String> result = getWithBearer("/api/v1/auth/me", token);
+
+      assertThat(result.getStatus().value()).isEqualTo(401);
+      assertThat(result.getResponseHeaders().getContentType()).isNotNull().hasToString("application/problem+json");
+      JsonNode node = MAPPER.readTree(result.getResponseBody());
+      assertThat(node.path("status").asInt()).isEqualTo(401);
+      assertThat(node.path("type").asString()).isEqualTo("about:blank");
+      assertThat(result.getResponseHeaders().getFirst("WWW-Authenticate")).isEqualTo("Bearer");
+      assertThat(result.getResponseBody()).doesNotContain(unknownId);
+    }
+  }
+
+  @Nested
+  class Security {
+
+    @Test
+    @DisplayName("FR-019 / Escenario 3: las 4 rutas POST publicas sin token nunca devuelven el 401 del entry point")
+    void shouldNeverReturnPlatformEntryPoint401OnPublicAuthRoutes() {
+      String[][] routes = {
+        {"/api/v1/auth/register", "{\"email\":\"no-es-correo\",\"displayName\":\"\",\"password\":\"x\"}"},
+        {"/api/v1/auth/login", "{\"email\":\"nadie@example.com\",\"password\":\"Wrong-pass-999\"}"},
+        {"/api/v1/auth/refresh", null},
+        {"/api/v1/auth/logout", null}
+      };
+      for (String[] route : routes) {
+        var request = client.post().uri(route[0]);
+        EntityExchangeResult<String> result =
+            (route[1] == null
+                    ? request.exchange()
+                    : request.contentType(MediaType.APPLICATION_JSON).body(route[1]).exchange())
+                .returnResult(String.class);
+
+        int status = result.getStatus().value();
+        assertThat(status).as(route[0]).isIn(204, 400, 401);
+        assertThat(result.getResponseHeaders().getFirst("WWW-Authenticate")).as(route[0]).isNull();
+        if (status == 401) {
+          assertThat(MAPPER.readTree(result.getResponseBody()).path("type").asString())
+              .as(route[0])
+              .startsWith("urn:mangateca:problem:");
+        }
+      }
+    }
+
+    @Test
+    @DisplayName("FR-019 / FR-020: refresh sin cookie responde el 401 propio de identity, sin WWW-Authenticate")
+    void shouldReturnIdentityProblemWhenRefreshHasNoCookie() {
+      EntityExchangeResult<String> result =
+          client.post().uri("/api/v1/auth/refresh").exchange().returnResult(String.class);
+
+      assertThat(result.getStatus().value()).isEqualTo(401);
+      assertThat(MAPPER.readTree(result.getResponseBody()).path("type").asString())
+          .isEqualTo("urn:mangateca:problem:invalid-refresh-token");
+      assertThat(result.getResponseHeaders().getFirst("WWW-Authenticate")).isNull();
+    }
+
+    @Test
+    @DisplayName("Escenario 3 / deny-by-default: /me y una ruta inexistente sin token dan el 401 del entry point")
+    void shouldReturnPlatform401WhenProtectedOrUnknownRouteHasNoToken() {
+      for (String uri : new String[] {"/api/v1/auth/me", "/api/v1/auth/inexistente"}) {
+        EntityExchangeResult<String> result = client.get().uri(uri).exchange().returnResult(String.class);
+
+        assertThat(result.getStatus().value()).as(uri).isEqualTo(401);
+        assertThat(result.getResponseHeaders().getFirst("WWW-Authenticate")).as(uri).isEqualTo("Bearer");
+        JsonNode node = MAPPER.readTree(result.getResponseBody());
+        assertThat(node.path("type").asString()).as(uri).isEqualTo("about:blank");
+        assertThat(node.path("status").asInt()).as(uri).isEqualTo(401);
+      }
+    }
+  }
+
+  @Nested
+  class Roles {
+
+    @Test
+    @DisplayName("Escenario 4 / FR-021 / SC-003: CUSTOMER real recibe 403 en la ruta de ADMIN")
+    void shouldReturn403WhenCustomerAccessesAdminRoute() {
+      String email = uniqueEmail();
+      register(email, "S3cret-pass-123");
+      String token = accessToken(login(email, "S3cret-pass-123"));
+
+      EntityExchangeResult<String> result = getWithBearer("/api/v1/probes/admin", token);
+
+      assertThat(result.getStatus().value()).isEqualTo(403);
+      assertThat(result.getResponseHeaders().getContentType())
+          .isNotNull()
+          .hasToString("application/problem+json");
+      assertThat(MAPPER.readTree(result.getResponseBody()).path("status").asInt()).isEqualTo(403);
+      assertThat(result.getResponseBody()).isNotEqualTo("admin");
+    }
+
+    @Test
+    @DisplayName("FR-008 / FR-021: token con roles=[ADMIN] accede a la ruta de ADMIN (roles -> ROLE_*)")
+    void shouldReturn200WhenTokenCarriesAdminRole() {
+      String token = testTokens.token(UUID.randomUUID().toString(), List.of("ADMIN"));
+
+      EntityExchangeResult<String> result = getWithBearer("/api/v1/probes/admin", token);
+
+      assertThat(result.getStatus().value()).isEqualTo(200);
+      assertThat(result.getResponseBody()).isEqualTo("admin");
     }
   }
 }

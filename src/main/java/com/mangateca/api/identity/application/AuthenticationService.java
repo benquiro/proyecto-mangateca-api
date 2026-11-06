@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -48,6 +49,12 @@ public class AuthenticationService {
     this.accessTokenIssuer = accessTokenIssuer;
     this.refreshTokenService = refreshTokenService;
     this.dummyHash = Objects.requireNonNull(passwordEncoder.encode(DUMMY_PASSWORD));
+  }
+
+  /** Usuario actual; vacio si no existe o esta deshabilitado (FR-016). */
+  @Transactional(readOnly = true)
+  public Optional<User> me(UUID userId) {
+    return userRepository.findById(userId).filter(User::isEnabled);
   }
 
   /**

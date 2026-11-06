@@ -41,6 +41,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -396,5 +397,37 @@ class AuthenticationServiceTests {
             "violacion", new SQLException("sql"), "insert into users", constraint);
     assertThat(cause.getConstraintName()).isEqualTo(constraint);
     return new DataIntegrityViolationException("integridad", cause);
+  }
+
+  @Nested
+  class Me {
+
+    @Test
+    @DisplayName("FR-016: me devuelve el usuario cuando existe y esta habilitado")
+    void shouldReturnUserWhenEnabled() {
+      User user = User.register(new Email(EMAIL), "Carrera", "{bcrypt}h", Role.CUSTOMER, CLOCK);
+      when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+      assertThat(service.me(user.getId())).containsSame(user);
+    }
+
+    @Test
+    @DisplayName("FR-016: me devuelve vacio cuando el usuario esta deshabilitado")
+    void shouldReturnEmptyWhenUserIsDisabled() {
+      User user = User.register(new Email(EMAIL), "Carrera", "{bcrypt}h", Role.CUSTOMER, CLOCK);
+      user.disable(CLOCK.instant());
+      when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+      assertThat(service.me(user.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("FR-016: me devuelve vacio cuando el id no existe")
+    void shouldReturnEmptyWhenUserDoesNotExist() {
+      UUID id = UUID.randomUUID();
+      when(userRepository.findById(id)).thenReturn(Optional.empty());
+
+      assertThat(service.me(id)).isEmpty();
+    }
   }
 }
