@@ -49,6 +49,10 @@ management:
       enabled: false
 
 logging:
+  level:
+    # Hibernate registra el "Detail: Key (lower(email::text))=(...)" de PostgreSQL al violar
+    # users_email_lower_uk, exponiendo el correo en claro (FR-002, R14). Se silencia ese logger.
+    org.hibernate.orm.jdbc.error: "OFF"
   structured:
     format:
       console: ecs
