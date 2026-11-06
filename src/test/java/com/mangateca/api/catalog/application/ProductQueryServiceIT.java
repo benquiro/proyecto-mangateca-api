@@ -1,0 +1,206 @@
+package com.mangateca.api.catalog.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+
+import javax.sql.DataSource;
+
+import jakarta.persistence.EntityManager;
+import org.hibernate.Hibernate;
+import org.hibernate.Session;
+import org.hibernate.stat.Statistics;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.jdbc.core.simple.JdbcClient;
+
+import com.mangateca.api.TestcontainersConfiguration;
+import com.mangateca.api.catalog.domain.Product;
+import com.mangateca.api.catalog.domain.ProductSearchCriteria;
+import com.mangateca.api.catalog.domain.PublicationStatus;
+import com.mangateca.api.catalog.support.CatalogTestData;
+
+@DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import({ TestcontainersConfiguration.class, ProductQueryService.class })
+class ProductQueryServiceIT {
+
+	private static final Instant BASE = Instant.parse("2025-01-01T00:00:00Z");
+
+	private static final long EXPECTED_STATEMENTS_PER_SEARCH = 3;
+
+	private static final Sort DEFAULT_SORT = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
+
+	@Autowired
+	private ProductQueryService service;
+
+	@Autowired
+	private EntityManager entityManager;
+
+	@Autowired
+	private DataSource dataSource;
+
+	private CatalogTestData data;
+
+	private UUID publisher;
+
+	@BeforeEach
+	void setUp() {
+		this.data = new CatalogTestData(JdbcClient.create(this.dataSource));
+		this.data.clear();
+		this.publisher = this.data.publisher("Editorial Test");
+	}
+
+	@Test
+	@DisplayName("US1 Escenario 1 / FR-001, FR-002: primera página con 20 publicados, más recientes primero")
+	void shouldReturnFirstPageOfPublishedProductsNewestFirst() {
+		for (int i = 0; i < 25; i++) {
+			this.data.product("Publicado " + i, this.publisher).createdAt(BASE.plusSeconds(i)).insert();
+		}
+		for (int i = 0; i < 3; i++) {
+			this.data.product("Borrador " + i, this.publisher)
+				.status(PublicationStatus.UNPUBLISHED)
+				.createdAt(BASE.plusSeconds(100 + i))
+				.insert();
+		}
+		this.entityManager.clear();
+
+		Page<Product> page = this.service.search(ProductSearchCriteria.NONE, PageRequest.of(0, 20, DEFAULT_SORT));
+
+		assertThat(page.getContent()).hasSize(20);
+		assertThat(page.getTotalElements()).isEqualTo(25);
+		assertThat(page.getTotalPages()).isEqualTo(2);
+		assertThat(page.getContent()).extracting(Product::getStatus).containsOnly(PublicationStatus.PUBLISHED);
+		assertThat(page.getContent()).extracting(Product::getTitle)
+			.containsExactlyElementsOf(IntStream.rangeClosed(5, 24)
+				.boxed()
+				.sorted(Comparator.reverseOrder())
+				.map(i -> "Publicado " + i)
+				.toList());
+	}
+
+	@Test
+	@DisplayName("US1 Escenario 1 / FR-004: el número de sentencias SQL no crece con el tamaño de página (sin N+1)")
+	void shouldIssueSameNumberOfStatementsRegardlessOfPageSize() {
+		UUID series = this.data.series("Serie Test", "Descripción");
+		UUID authorA = this.data.author("Autor A");
+		UUID authorB = this.data.author("Autor B");
+		for (int i = 0; i < 25; i++) {
+			this.data.product("Producto " + i, this.publisher)
+				.createdAt(BASE.plusSeconds(i))
+				.series(series, i + 1)
+				.authors(authorA, authorB)
+				.insert();
+		}
+		Statistics statistics = this.entityManager.unwrap(Session.class).getSessionFactory().getStatistics();
+
+		long singleItemStatements = statementsForSearch(statistics, PageRequest.of(0, 1, DEFAULT_SORT), 1);
+		long fullPageStatements = statementsForSearch(statistics, PageRequest.of(0, 20, DEFAULT_SORT), 20);
+
+		assertThat(fullPageStatements).isEqualTo(singleItemStatements);
+		// Exactamente ids de la página + count + carga con fetch de relaciones. Una paginación en memoria
+		// (fetch join + límite sobre colección) emitiría menos sentencias y no respetaría el límite en BD.
+		assertThat(fullPageStatements).isEqualTo(EXPECTED_STATEMENTS_PER_SEARCH);
+	}
+
+	private long statementsForSearch(Statistics statistics, Pageable pageable, int expectedSize) {
+		this.entityManager.flush();
+		this.entityManager.clear();
+		statistics.clear();
+
+		Page<Product> page = this.service.search(ProductSearchCriteria.NONE, pageable);
+
+		assertThat(page.getContent()).hasSize(expectedSize);
+		for (Product product : page.getContent()) {
+			assertThat(Hibernate.isInitialized(product.getAuthors())).isTrue();
+			assertThat(product.getAuthors()).hasSize(2);
+			assertThat(Hibernate.isInitialized(product.getSeries())).isTrue();
+			assertThat(product.getSeries()).isNotNull();
+		}
+		return statistics.getPrepareStatementCount();
+	}
+
+	@Test
+	@DisplayName("US1 Escenario 3 / FR-002: una página fuera de rango devuelve contenido vacío y el total real")
+	void shouldReturnEmptyContentWhenPageIsBeyondLastPage() {
+		for (int i = 0; i < 45; i++) {
+			this.data.product("Producto " + i, this.publisher).createdAt(BASE.plusSeconds(i)).insert();
+		}
+		this.entityManager.clear();
+
+		Page<Product> page = this.service.search(ProductSearchCriteria.NONE, PageRequest.of(50, 20, DEFAULT_SORT));
+
+		assertThat(page.getContent()).isEmpty();
+		assertThat(page.getTotalElements()).isEqualTo(45);
+	}
+
+	static Stream<Arguments> sortCases() {
+		return Stream.of(Arguments.of("title", Sort.Direction.ASC), Arguments.of("price", Sort.Direction.DESC),
+				Arguments.of("publicationDate", Sort.Direction.DESC), Arguments.of("createdAt", Sort.Direction.ASC));
+	}
+
+	@ParameterizedTest(name = "{0} {1}")
+	@MethodSource("sortCases")
+	@DisplayName("US1 Escenario 4 / FR-004: el orden pedido se respeta y los empates se resuelven por id")
+	void shouldSortByRequestedPropertyWithIdAsTieBreaker(String property, Sort.Direction direction) {
+		// Seis productos en tres grupos de dos con el mismo valor en cualquier propiedad ordenable.
+		List<UUID> ids = new ArrayList<>();
+		List<String> titles = List.of("Alfa", "Alfa", "Beta", "Beta", "Gamma", "Gamma");
+		for (int i = 0; i < titles.size(); i++) {
+			int group = i / 2;
+			ids.add(this.data.product(titles.get(i), this.publisher)
+				.price(1000L * (group + 1))
+				.publicationDate(LocalDate.of(2020 + group, 1, 1))
+				.createdAt(BASE.plusSeconds(group))
+				.insert());
+		}
+		this.entityManager.clear();
+		Sort sort = Sort.by(new Sort.Order(direction, property), new Sort.Order(direction, "id"));
+
+		Page<Product> page = this.service.search(ProductSearchCriteria.NONE, PageRequest.of(0, 20, sort));
+
+		Comparator<Product> byProperty = propertyComparator(property);
+		// Los UUID se ordenan en PostgreSQL byte a byte, equivalente al orden de su texto hexadecimal.
+		Comparator<Product> byId = Comparator.comparing(p -> p.getId().toString());
+		Comparator<Product> expected = direction.isAscending() ? byProperty.thenComparing(byId)
+				: byProperty.reversed().thenComparing(byId.reversed());
+		List<Product> actual = page.getContent();
+		assertThat(actual).hasSize(ids.size());
+		assertThat(actual).extracting(Product::getId).containsExactlyElementsOf(actual.stream().sorted(expected).map(Product::getId).toList());
+		// Repetible: una segunda ejecución devuelve exactamente la misma secuencia.
+		this.entityManager.clear();
+		assertThat(this.service.search(ProductSearchCriteria.NONE, PageRequest.of(0, 20, sort)).getContent())
+			.extracting(Product::getId)
+			.containsExactlyElementsOf(actual.stream().map(Product::getId).toList());
+	}
+
+	private static Comparator<Product> propertyComparator(String property) {
+		return switch (property) {
+			case "title" -> Comparator.comparing(Product::getTitle);
+			case "price" -> Comparator.comparing(Product::getPrice);
+			case "publicationDate" -> Comparator.comparing(Product::getPublicationDate);
+			case "createdAt" -> Comparator.comparing(Product::getCreatedAt);
+			default -> throw new IllegalArgumentException(property);
+		};
+	}
+
+}
