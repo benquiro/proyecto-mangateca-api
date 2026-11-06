@@ -88,7 +88,12 @@ class AuthenticationServiceTests {
             eventPublisher,
             CLOCK,
             new AccessTokenIssuer(jwtEncoder(), properties, CLOCK),
-            new RefreshTokenService(refreshTokenRepository, properties));
+            new RefreshTokenService(
+                refreshTokenRepository,
+                userRepository,
+                new AccessTokenIssuer(jwtEncoder(), properties, CLOCK),
+                properties,
+                CLOCK));
     // el constructor calcula el hash ficticio; los tests parten sin interacciones previas
     clearInvocations(passwordEncoder);
   }
@@ -174,7 +179,12 @@ class AuthenticationServiceTests {
               publishedEvents::add,
               clock,
               new AccessTokenIssuer(jwtEncoder(), properties, clock),
-              new RefreshTokenService(refreshTokenRepository, properties));
+              new RefreshTokenService(
+                  refreshTokenRepository,
+                  userRepository,
+                  new AccessTokenIssuer(jwtEncoder(), properties, clock),
+                  properties,
+                  clock));
     }
 
     @Test
