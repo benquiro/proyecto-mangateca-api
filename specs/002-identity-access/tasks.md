@@ -376,13 +376,13 @@ recursos.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T061 [CODE] Anotar `src/main/java/com/mangateca/api/identity/web/AuthController.java` con springdoc (`@Tag`, `@Operation`, `@ApiResponse` con los códigos y `type` de problema de `contracts/openapi.yaml`, `@SecurityRequirements` vacío en las 4 rutas públicas y `bearerAuth` en `/me`) (DoD: API documentada en OpenAPI).
-- [ ] T062 [DOC] Contrastar `GET /v3/api-docs` con `specs/002-identity-access/contracts/openapi.yaml` (rutas, códigos y esquemas) y corregir el contrato o las anotaciones hasta que coincidan; dejar constancia en `specs/002-identity-access/contracts/openapi.yaml` (comentario de verificación con la fecha).
-- [ ] T063 [P] [DOC] Añadir una sección «Identidad y claves» a `README.md` con el par efímero en dev/test, las variables `MANGATECA_IDENTITY_JWT_*` de producción, el comando `openssl` y las variables del administrador inicial (contracts/configuration.md).
-- [ ] T064 [P] [DOC] Anotar en `specs/001-platform-foundation/contracts/configuration.md` que `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION` queda sustituida por `MANGATECA_IDENTITY_JWT_*` (feature 002, ADR-006), y en `specs/001-platform-foundation/contracts/http-surface.md` que un `ProblemDetail` con `type` ≠ `about:blank` conserva su `type` y su `detail` (T019).
-- [ ] T065 [DOC] Ejecutar a mano `specs/002-identity-access/quickstart.md` §2–§8 y marcar cada paso como verificado en ese archivo. Incluye:
+- [X] T061 [CODE] Anotar `src/main/java/com/mangateca/api/identity/web/AuthController.java` con springdoc (`@Tag`, `@Operation`, `@ApiResponse` con los códigos y `type` de problema de `contracts/openapi.yaml`, `@SecurityRequirements` vacío en las 4 rutas públicas y `bearerAuth` en `/me`) (DoD: API documentada en OpenAPI).
+- [X] T062 [DOC] Contrastar `GET /v3/api-docs` con `specs/002-identity-access/contracts/openapi.yaml` (rutas, códigos y esquemas) y corregir el contrato o las anotaciones hasta que coincidan; dejar constancia en `specs/002-identity-access/contracts/openapi.yaml` (comentario de verificación con la fecha).
+- [X] T063 [P] [DOC] Añadir una sección «Identidad y claves» a `README.md` con el par efímero en dev/test, las variables `MANGATECA_IDENTITY_JWT_*` de producción, el comando `openssl` y las variables del administrador inicial (contracts/configuration.md).
+- [X] T064 [P] [DOC] Anotar en `specs/001-platform-foundation/contracts/configuration.md` que `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION` queda sustituida por `MANGATECA_IDENTITY_JWT_*` (feature 002, ADR-006), y en `specs/001-platform-foundation/contracts/http-surface.md` que un `ProblemDetail` con `type` ≠ `about:blank` conserva su `type` y su `detail` (T019).
+- [X] T065 [DOC] Ejecutar a mano `specs/002-identity-access/quickstart.md` §2–§8 y marcar cada paso como verificado en ese archivo. Incluye:
   - §3d: contraseña de más de 72 bytes → 400.
-  - §8: arranque sin perfil y sin claves → fallo; par no correspondiente → fallo; `git grep "BEGIN .*PRIVATE KEY"` sin resultados.
+  - §8: arranque sin perfil y sin claves → fallo; par no correspondiente → fallo; `git grep -l -e "-----BEGIN [A-Z ]*PRIVATE KEY-----"` sin resultados.
   - Ausencia del log «Using generated security password» (research R9).
 
 **Checkpoint final**: `./mvnw verify` en verde (compilación sin advertencias, tests de 001 y 002,
