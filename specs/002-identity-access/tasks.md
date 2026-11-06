@@ -222,7 +222,7 @@ cookie de refresh de 7 días.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T033 [P] [US2] [TEST] Crear `UserLockoutTests` en `src/test/java/com/mangateca/api/identity/domain/UserLockoutTests.java`, unitario sin Spring ni BD con `User` real e instantes explícitos. Casos:
+- [X] T033 [P] [US2] [TEST] Crear `UserLockoutTests` en `src/test/java/com/mangateca/api/identity/domain/UserLockoutTests.java`, unitario sin Spring ni BD con `User` real e instantes explícitos. Casos:
   - 5 `registerFailedLogin` consecutivos → `isLocked(now)` y `lockedUntil = now + 15 min`.
   - `isLocked` sigue siendo `true` a `now + 14m59s` y pasa a `false` a `now + 15m`.
   - Un fallo sobre una cuenta bloqueada no amplía el bloqueo.
@@ -230,41 +230,41 @@ cookie de refresh de 7 días.
   - `registerSuccessfulLogin` con 4 fallos deja el contador en 0.
 
   Cubre US2 Escenarios 3 y 4, FR-010 y Principio VI.2.
-- [ ] T034 [P] [US2] [TEST] Crear `AuthenticationServiceTests` en `src/test/java/com/mangateca/api/identity/application/AuthenticationServiceTests.java`, unitario sin Spring.
+- [X] T034 [P] [US2] [TEST] Crear `AuthenticationServiceTests` en `src/test/java/com/mangateca/api/identity/application/AuthenticationServiceTests.java`, unitario sin Spring.
   - **Montaje**: mocks de `UserRepository` y `RefreshTokenRepository`; `Clock` de test avanzable a mano (subclase de `Clock` en el test, sin `sleep`); `PasswordEncoder` delegante real; `AccessTokenIssuer` real sobre un `NimbusJwtEncoder` con par efímero; `RefreshTokenService` real; publicador de eventos como lambda que captura (no mock).
   - **Casos**:
     - Contraseña errónea y correo inexistente lanzan la misma `InvalidCredentialsException` con el mismo `ProblemDetail` (Escenario 2, FR-009).
     - Tras 5 fallos, la contraseña correcta lanza `InvalidCredentialsException`; al avanzar el `Clock` 15 min, el login tiene éxito (Escenario 3, FR-010, SC-004).
     - Con 4 fallos, el login correcto deja `failedLoginAttempts = 0` (Escenario 4).
     - Una cuenta `disable(now)` con credenciales correctas lanza la misma excepción (Escenario 5, FR-011).
-- [ ] T035 [US2] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/web/AuthControllerTests.java` los casos de login:
+- [X] T035 [US2] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/web/AuthControllerTests.java` los casos de login:
   - Login correcto → 200 con `access_token`, `token_type=Bearer` y `expires_in=900`, sin `refresh_token` en el cuerpo, y `Set-Cookie: refresh_token=…; Path=/api/v1/auth; Max-Age=604800; HttpOnly; Secure; SameSite=Strict` (Escenario 1, FR-007, Constitución V).
   - El servicio lanza `InvalidCredentialsException` → 401 con `type=urn:mangateca:problem:invalid-credentials` (FR-009, FR-020).
   - Cuerpo `{}` → 400 con `errors` (`@Valid`, Higiene Operacional).
-- [ ] T036 [US2] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` el `@Nested Login`:
+- [X] T036 [US2] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` el `@Nested Login`:
   - Flujo feliz de login: el `exp − iat` del JWT es 900, `sub` es el UUID del usuario, `roles=["CUSTOMER"]`, la cookie trae `Max-Age=604800` y el access token obtiene 200 en `GET /api/v1/probes?size=1` (Escenario 1, FR-007, FR-008).
   - La respuesta a contraseña errónea y la respuesta a correo inexistente coinciden en `status`, `type` y `detail` (Escenario 2, FR-009, SC-002).
 
 ### Implementation for User Story 2
 
-- [ ] T037 [US2] [CODE] Añadir a `src/main/java/com/mangateca/api/identity/domain/User.java` las constantes `MAX_FAILED_ATTEMPTS = 5` y `LOCK_DURATION = Duration.ofMinutes(15)` y los métodos `isLocked(Instant)`, `registerFailedLogin(Instant)` y `registerSuccessfulLogin(Instant)` según research R6. Cada método actualiza `updatedAt` (FR-010).
-- [ ] T038 [P] [US2] [CODE] Crear `AccessTokenIssuer` en `src/main/java/com/mangateca/api/identity/application/AccessTokenIssuer.java`. Usa `JwsHeader.with(SignatureAlgorithm.RS256)` y `JwtClaimsSet` con `sub = userId`, `roles = List.of(role.name())`, `iss` de `mangateca.identity.jwt.issuer`, `iat = clock.instant()` y `exp = iat + accessTokenTtl`, y devuelve el valor del token y `expiresIn` en segundos (FR-007, FR-008, research R2).
-- [ ] T039 [P] [US2] [CODE] Crear `InvalidCredentialsException extends ErrorResponseException` en `src/main/java/com/mangateca/api/identity/application/InvalidCredentialsException.java`. `ProblemDetail` 401 con `type=urn:mangateca:problem:invalid-credentials` y `detail` constante «Credenciales inválidas.» (FR-009, FR-020, research R10).
-- [ ] T040 [P] [US2] [CODE] Crear `RefreshTokenService` con `issue(UUID userId, Instant now)` en `src/main/java/com/mangateca/api/identity/application/RefreshTokenService.java`. Genera 32 bytes con `SecureRandom`, los codifica en Base64 URL sin relleno, guarda `RefreshToken.issue` con el SHA-256 del texto y un `family_id` nuevo, y devuelve el valor en claro una sola vez (FR-007, FR-015, research R7).
-- [ ] T041 [US2] [CODE] Añadir `login(String email, String password)` a `src/main/java/com/mangateca/api/identity/application/AuthenticationService.java` y crear el record `IssuedTokens(String accessToken, long expiresIn, String refreshToken)` en `src/main/java/com/mangateca/api/identity/application/IssuedTokens.java`.
+- [X] T037 [US2] [CODE] Añadir a `src/main/java/com/mangateca/api/identity/domain/User.java` las constantes `MAX_FAILED_ATTEMPTS = 5` y `LOCK_DURATION = Duration.ofMinutes(15)` y los métodos `isLocked(Instant)`, `registerFailedLogin(Instant)` y `registerSuccessfulLogin(Instant)` según research R6. Cada método actualiza `updatedAt` (FR-010).
+- [X] T038 [P] [US2] [CODE] Crear `AccessTokenIssuer` en `src/main/java/com/mangateca/api/identity/application/AccessTokenIssuer.java`. Usa `JwsHeader.with(SignatureAlgorithm.RS256)` y `JwtClaimsSet` con `sub = userId`, `roles = List.of(role.name())`, `iss` de `mangateca.identity.jwt.issuer`, `iat = clock.instant()` y `exp = iat + accessTokenTtl`, y devuelve el valor del token y `expiresIn` en segundos (FR-007, FR-008, research R2).
+- [X] T039 [P] [US2] [CODE] Crear `InvalidCredentialsException extends ErrorResponseException` en `src/main/java/com/mangateca/api/identity/application/InvalidCredentialsException.java`. `ProblemDetail` 401 con `type=urn:mangateca:problem:invalid-credentials` y `detail` constante «Credenciales inválidas.» (FR-009, FR-020, research R10).
+- [X] T040 [P] [US2] [CODE] Crear `RefreshTokenService` con `issue(UUID userId, Instant now)` en `src/main/java/com/mangateca/api/identity/application/RefreshTokenService.java`. Genera 32 bytes con `SecureRandom`, los codifica en Base64 URL sin relleno, guarda `RefreshToken.issue` con el SHA-256 del texto y un `family_id` nuevo, y devuelve el valor en claro una sola vez (FR-007, FR-015, research R7).
+- [X] T041 [US2] [CODE] Añadir `login(String email, String password)` a `src/main/java/com/mangateca/api/identity/application/AuthenticationService.java` y crear el record `IssuedTokens(String accessToken, long expiresIn, String refreshToken)` en `src/main/java/com/mangateca/api/identity/application/IssuedTokens.java`.
   - Transacción `@Transactional(noRollbackFor = InvalidCredentialsException.class)` con `findByEmailForUpdate`.
   - Correo que el VO `Email` rechaza, correo inexistente, cuenta deshabilitada o bloqueada → `matches(password, DUMMY_HASH)` y `InvalidCredentialsException`.
   - Contraseña errónea → `registerFailedLogin` y la misma excepción.
   - Login correcto → `registerSuccessfulLogin`, `AccessTokenIssuer` y `RefreshTokenService.issue`.
 
   Sin logs de correo ni contraseña. Cubre FR-007, FR-009, FR-010 y FR-011 (research R5, R6, R11, R14).
-- [ ] T042 [P] [US2] [CODE] Crear los records DTO `LoginRequest` y `TokenResponse` en `src/main/java/com/mangateca/api/identity/web/LoginRequest.java` y `src/main/java/com/mangateca/api/identity/web/TokenResponse.java`:
+- [X] T042 [P] [US2] [CODE] Crear los records DTO `LoginRequest` y `TokenResponse` en `src/main/java/com/mangateca/api/identity/web/LoginRequest.java` y `src/main/java/com/mangateca/api/identity/web/TokenResponse.java`:
   - `LoginRequest(@NotBlank String email, @NotBlank String password)`, sin `@ValidPassword` y con `toString()` sin la contraseña.
   - `TokenResponse` con `@JsonProperty("access_token")`, `"token_type"` (`"Bearer"`) y `"expires_in"`.
 
   Cubre FR-007 y FR-009.
-- [ ] T043 [P] [US2] [CODE] Crear `RefreshCookieFactory` (`@Component`) con `create(String token)` y `clear()` en `src/main/java/com/mangateca/api/identity/web/RefreshCookieFactory.java`. Ambos construyen `ResponseCookie` `refresh_token` con `Path=/api/v1/auth`, `HttpOnly`, `Secure` y `SameSite` de `IdentityProperties`; `create` usa `Max-Age = refreshTokenTtl` y `clear` usa `Max-Age=0` (FR-007, Constitución V, research R8).
-- [ ] T044 [US2] [CODE] Añadir `POST /login` (`@Valid @RequestBody LoginRequest`) a `src/main/java/com/mangateca/api/identity/web/AuthController.java`: responde 200 con `TokenResponse` y la cabecera `Set-Cookie` de `RefreshCookieFactory.create` (FR-007, FR-019, Higiene Operacional).
+- [X] T043 [P] [US2] [CODE] Crear `RefreshCookieFactory` (`@Component`) con `create(String token)` y `clear()` en `src/main/java/com/mangateca/api/identity/web/RefreshCookieFactory.java`. Ambos construyen `ResponseCookie` `refresh_token` con `Path=/api/v1/auth`, `HttpOnly`, `Secure` y `SameSite` de `IdentityProperties`; `create` usa `Max-Age = refreshTokenTtl` y `clear` usa `Max-Age=0` (FR-007, Constitución V, research R8).
+- [X] T044 [US2] [CODE] Añadir `POST /login` (`@Valid @RequestBody LoginRequest`) a `src/main/java/com/mangateca/api/identity/web/AuthController.java`: responde 200 con `TokenResponse` y la cabecera `Set-Cookie` de `RefreshCookieFactory.create` (FR-007, FR-019, Higiene Operacional).
 
 **Checkpoint**: `./mvnw verify` en verde con T033–T036. US1 sigue en verde.
 
