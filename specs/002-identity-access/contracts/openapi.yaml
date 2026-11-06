@@ -1,3 +1,14 @@
+# Verificacion T062 (2026-11-05): contrastado con GET /v3/api-docs (perfil dev) en rutas, metodos,
+# codigos de respuesta, tipos de contenido, esquemas de request/response, nombres JSON
+# (access_token, token_type, expires_in), esquema de seguridad bearerAuth, cookie refresh_token
+# (entrada y Set-Cookie) y textos `detail` de los ejemplos. Divergencias aceptadas, por diseno:
+#  - info/servers/tags: el documento generado es de toda la API (titulo "Mangateca API"); este
+#    contrato es solo del modulo identity.
+#  - ProblemDetail: el esquema generado es el de Spring (campo `properties` como mapa libre,
+#    `instance` con format uri, sin `required`). En runtime las extensiones se aplanan en el
+#    nivel raiz (p. ej. `errors`), tal como describe este contrato.
+#  - Seguridad: el generado declara bearerAuth global y `security: []` en operaciones publicas;
+#    equivalente a este contrato.
 openapi: 3.1.0
 info:
   title: Mangateca API - Identity & Access
@@ -45,7 +56,7 @@ paths:
                 type: urn:mangateca:problem:email-already-in-use
                 title: Conflict
                 status: 409
-                detail: El correo ya esta en uso.
+                detail: El correo ya está en uso.
                 instance: /api/v1/auth/register
   /api/v1/auth/login:
     post:
@@ -73,7 +84,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/TokenResponse'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: "Cuerpo invalido: `email` o `password` vacios o ausentes."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
         '401':
           description: Credenciales invalidas (tipo `invalid-credentials`).
           content:
@@ -84,7 +99,7 @@ paths:
                 type: urn:mangateca:problem:invalid-credentials
                 title: Unauthorized
                 status: 401
-                detail: Credenciales invalidas.
+                detail: Credenciales inválidas.
                 instance: /api/v1/auth/login
   /api/v1/auth/refresh:
     post:
@@ -101,7 +116,7 @@ paths:
           required: false
           description: Token de renovacion. Su ausencia produce el mismo 401 que un token invalido.
           schema:
-            type: string
+            type: [string, 'null']
       responses:
         '200':
           description: Nuevo token de acceso; nueva cookie de renovacion en `Set-Cookie`.
@@ -122,7 +137,7 @@ paths:
                 type: urn:mangateca:problem:invalid-refresh-token
                 title: Unauthorized
                 status: 401
-                detail: Token de renovacion invalido.
+                detail: Token de renovación inválido.
                 instance: /api/v1/auth/refresh
   /api/v1/auth/logout:
     post:
@@ -137,8 +152,9 @@ paths:
         - name: refresh_token
           in: cookie
           required: false
+          description: Token de renovacion. Su ausencia o invalidez tambien produce 204.
           schema:
-            type: string
+            type: [string, 'null']
       responses:
         '204':
           description: Sesion cerrada (o no existia). La cookie se borra con `Max-Age=0`.
@@ -196,7 +212,7 @@ components:
             type: about:blank
             title: Bad Request
             status: 400
-            detail: La peticion contiene campos invalidos.
+            detail: La petición contiene campos inválidos.
             instance: /api/v1/auth/register
             errors:
               - field: password
@@ -214,7 +230,6 @@ components:
           example: ana@example.com
         displayName:
           type: string
-          minLength: 1
           maxLength: 100
           description: Longitud valida tras recortar espacios.
           example: Ana
@@ -234,10 +249,12 @@ components:
       properties:
         email:
           type: string
+          minLength: 1
           example: ana@example.com
         password:
           type: string
           format: password
+          minLength: 1
           writeOnly: true
     TokenResponse:
       type: object
@@ -248,7 +265,7 @@ components:
           description: JWT RS256 con claims `sub`, `roles`, `iss`, `iat`, `exp`.
         token_type:
           type: string
-          const: Bearer
+          enum: [Bearer]
         expires_in:
           type: integer
           description: Segundos hasta la expiracion.
