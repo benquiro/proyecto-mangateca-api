@@ -119,7 +119,7 @@ documentación consultada no cierra se marca **«verificar en implementación»*
 - **Test**: `ProductQueryServiceIT` activa `hibernate.generate_statistics` y comprueba que el
   número de sentencias es el mismo para una página de 1 y de 20 productos (sin N+1).
 
-## R4. Paginación: validación propia y `PagedModel`
+## R4. Paginación: validación propia y `PageResponse`
 
 - **Decision**:
   - Ningún método de controlador recibe `Pageable`. El argument resolver de Spring Data **ajusta
@@ -131,14 +131,17 @@ documentación consultada no cierra se marca **«verificar en implementación»*
     `PageParams.MAX_SIZE = 100` y `PageParams.MAX_PAGE = 1_000_000`, que `ProductSearchRequest`
     reutiliza en sus propias anotaciones `@Max` (son constantes de compilación).
   - El controlador construye `PageRequest.of(page, size, sort)`.
-  - La respuesta es `PagedModel<T>` (`org.springframework.data.web.PagedModel`) creado
-    explícitamente con `new PagedModel<>(page.map(mapper::…))`: JSON `{ "content": […],
-    "page": { "size", "number", "totalElements", "totalPages" } }`. **No se serializa
-    `PageImpl`** y no se toca `@EnableSpringDataWebSupport`.
-- **Rationale**: crear el `PagedModel` a mano es una línea, es explícito y no cambia la
-  serialización de ningún otro módulo. Un record `PageResponse<T>` propio sería equivalente
-  pero extra. **Verificar en implementación** la firma del constructor en Spring Data 4.1.
-- **Alternatives considered**: `@EnableSpringDataWebSupport(pageSerializationMode =
+  - La respuesta es el record `PageResponse<T>(List<T> content, PageMetadata page)`, con
+    `PageMetadata(int size, int number, long totalElements, int totalPages)` y la fábrica
+    `PageResponse.from(Page<T>)`: JSON `{ "content": […], "page": { "size", "number",
+    "totalElements", "totalPages" } }`. **No se serializa `PageImpl`** y no se toca
+    `@EnableSpringDataWebSupport`.
+- **Rationale**: la Constitución III exige que los DTO sean `record`; `PagedModel` es una clase
+  de Spring Data y ataría el contrato a su serialización. El record propio produce la misma forma
+  JSON, es explícito y no cambia la serialización de ningún otro módulo. Vive en `catalog.web`
+  mientras solo lo use este módulo (VII).
+- **Alternatives considered**: `PagedModel` creado a mano con `new PagedModel<>(page)` (una
+  línea menos, pero no es `record`); `@EnableSpringDataWebSupport(pageSerializationMode =
   VIA_DTO)` (global: afecta a futuras features y a springdoc de forma implícita);
   `spring.data.web.pageable.max-page-size` (descartada por lo ya dicho).
 - Las violaciones llegan como `HandlerMethodValidationException` o `MethodArgumentNotValidException`;
@@ -202,7 +205,7 @@ documentación consultada no cierra se marca **«verificar en implementación»*
   2. El frontend necesita los datos de la serie (nombre, descripción) sin cargar volúmenes, p.
      ej. el enlace desde el detalle de un producto; con el subrecurso solo pide lo que pinta.
   3. Reutiliza sin cambios la tarjeta, el mapper y el flujo en dos pasos de R3.
-- **Alternativa simple descartada**: `GET /series/{id}` con `volumes: PagedModel<…>`
+- **Alternativa simple descartada**: `GET /series/{id}` con `volumes: PageResponse<…>`
   embebido. Un único recorrido de red, pero rompe 1) y 2). **Costo aceptado**: dos llamadas
   para pintar una página de serie.
 - **Nota sobre la spec**: US4 habla de «consultar la serie» y ver nombre, descripción y
@@ -327,7 +330,7 @@ documentación consultada no cierra se marca **«verificar en implementación»*
   mirar otra tabla); un *trigger* diferido sería complejidad sin evidencia (VII). Se garantiza
   en la fábrica de `Product` que añade la feature 004, que es la única que crea productos (la
   spec lo recoge en Assumptions). Las restricciones que sí están en V3 tienen test propio
-  (`CatalogConstraintsIT`). En
+  (opcionales según VI, sin tarea en `tasks.md`). En
   003 el módulo es de solo lectura: las entidades llevan constructor `protected` sin fábrica
   pública. Los CHECK de tipo, estado, precio, ISBN y coherencia serie/volumen y las `UNIQUE`
   sí están en V3.

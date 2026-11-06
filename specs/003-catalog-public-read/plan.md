@@ -26,7 +26,7 @@ Decisiones clave (detalle en [research.md](research.md)):
    la página. Evita la paginación en memoria de Hibernate (R3).
 4. **Paginación validada por nosotros, no por Spring**: ningún endpoint recibe `Pageable`;
    `page` y `size` se validan con Bean Validation y `size > 100` responde 400 (R4). La
-   respuesta es `PagedModel` de Spring Data, nunca `PageImpl`.
+   respuesta es el record `PageResponse<T>` (`content` + `page`), nunca `PageImpl` ni `PagedModel`.
 5. **Orden por lista blanca** de claves de API (`title`, `price`, `publicationDate`,
    `createdAt`) con desempate estable por `id` (R5).
 6. **Series en dos endpoints** (`/series/{id}` y `/series/{id}/volumes`) con 404 si la serie no
@@ -80,9 +80,9 @@ decimales.
 | II | Invariantes en el dominio | `Money` (monto > 0, escala 0) e `Isbn` (formato y dígito verificador) en constructores compactos. Serie/volumen y ≥1 autor/género se protegen con CHECK y FK en V3; la fábrica de `Product` llega con la feature 004, que es la que crea productos (R14) | ✅ |
 | II | Dinero en `BigDecimal`/`Money` | `Money` record sobre `BigDecimal` con escala 0; columna `numeric(12,0)` | ✅ |
 | II | Identificadores de negocio como VO `record` | `Isbn` | ✅ |
-| III | Java 25, Boot 4.1.x, solo APIs estables | Specifications, `findBy` fluido, `PagedModel`, `EXISTS`; ninguna API preview ni deprecada | ✅ |
+| III | Java 25, Boot 4.1.x, solo APIs estables | Specifications, `findBy` fluido, `EXISTS`; ninguna API preview ni deprecada | ✅ |
 | III | No eliminar dependencias base; ADR por dependencia nueva | Ninguna dependencia nueva ni eliminada; no hay ADR | ✅ |
-| III | DTO, comandos, eventos y VO como `record` | Todos los DTO, `ProductSearchCriteria`, `Money`, `Isbn`, `PageParams`, `ProductSearchRequest` | ✅ |
+| III | DTO, comandos, eventos y VO como `record` | Todos los DTO (incluida la respuesta paginada `PageResponse<T>`), `ProductSearchCriteria`, `Money`, `Isbn`, `PageParams`, `ProductSearchRequest` | ✅ |
 | III | Lombok solo en entidades; sin `@Data` | `@Getter` únicamente en las cinco entidades | ✅ |
 | IV | PostgreSQL único; Flyway versionado e inmutable | `V3__create_catalog.sql` nueva; V1 y V2 intactas | ✅ |
 | IV | `ddl-auto=validate`, OSIV off | Sin cambios; `SchemaDriftIT` y el smoke test validan V3 contra las entidades | ✅ |
@@ -105,7 +105,7 @@ decimales.
 | VII | Trade-offs documentados | Tabla de trade-offs | ✅ |
 | Hig. | DTO de entrada validados con `@Valid` | `PageParams` y `ProductSearchRequest` con `@Valid` | ✅ |
 | Hig. | CORS explícito; Actuator `health`/`info`; sin PII en logs | Sin cambios; el catálogo no registra PII | ✅ |
-| DoD | `spec.md`, `plan.md` y `tasks.md` aprobados; OpenAPI | `tasks.md` pendiente (`/speckit-tasks`); OpenAPI de springdoc contrastado con [contracts/openapi.yaml](contracts/openapi.yaml) | ⏳ |
+| DoD | `spec.md`, `plan.md` y `tasks.md` aprobados; OpenAPI | `tasks.md` generado (`/speckit-tasks`) y analizado (`/speckit-analyze`); OpenAPI de springdoc contrastado con [contracts/openapi.yaml](contracts/openapi.yaml) | ⏳ |
 
 **Resultado pre-Phase 0**: PASS, sin violaciones.
 
@@ -128,7 +128,7 @@ interfaces, dependencias, caché ni rutas anónimas fuera de `GET`/`HEAD` sobre 
 | `ClassificationQueryService` separado de `ProductQueryService` | Cambian por razones distintas: tarjetas con filtros vs. listados alfabéticos con `EXISTS` | Un único servicio de ~250 líneas | 1 dependencia entre dos clases concretas (volúmenes → comprobar serie visible) |
 | Cadena `SecurityFilterChain` propia en `catalog` | Rutas públicas sin que `platform` conozca `/api/v1/products` | `permitAll` en `platform.SecurityConfiguration`: acopla `platform` a `catalog` | Una tercera cadena que mantener (mismo patrón que `identity`) |
 | Dos endpoints de serie | Paginar los volúmenes de forma estándar y reutilizar la tarjeta de producto | Lista paginada embebida en el detalle de la serie (R7) | Dos llamadas del cliente para pintar una página de serie |
-| `PagedModel` directo, sin record propio | Respuesta paginada estable (`content` + `page`) para los 6 listados | Record `PageResponse<T>` propio: 1 clase extra equivalente | Depender de la forma JSON de Spring Data |
+| Record `PageResponse<T>` (`content` + `PageMetadata`) en `catalog.web` | Respuesta paginada estable para los 6 listados como DTO `record` (Principio III), sin serializar `PageImpl` ni depender de la forma JSON de una clase de Spring Data | `PagedModel` de Spring Data: no es un `record` y ata el contrato a la serialización de la librería | 1 record (con un record anidado) y una fábrica `from(Page)`; vive en `catalog` hasta que otro módulo lo necesite (VII) |
 
 ## Project Structure
 
@@ -175,6 +175,7 @@ src/main/java/com/mangateca/api/catalog/
 │   ├── SeriesController.java          # GET /api/v1/series, /{id}, /{id}/volumes
 │   ├── ClassificationController.java  # GET /api/v1/genres, /authors, /publishers
 │   ├── PageParams.java  ProductSearchRequest.java
+│   ├── PageResponse.java              # record de respuesta paginada (content + page)
 │   ├── ValidPriceRange.java  ValidPriceRangeValidator.java
 │   ├── CatalogMapper.java             # MapStruct
 │   ├── ProductSummaryResponse.java  ProductDetailResponse.java
@@ -187,7 +188,7 @@ src/main/java/com/mangateca/api/catalog/
 src/main/resources/db/migration/V3__create_catalog.sql
 
 src/test/java/com/mangateca/api/catalog/
-├── domain/   MoneyTests, IsbnTests, ProductSearchIT, ClassificationRepositoryIT, CatalogConstraintsIT
+├── domain/   MoneyTests, IsbnTests, ProductSearchIT, ClassificationRepositoryIT
 ├── application/ ProductQueryServiceIT, ClassificationQueryServiceIT
 ├── web/      ProductControllerTests, SeriesControllerTests, ClassificationControllerTests
 ├── support/  CatalogTestData (inserta por JDBC), CatalogFixtures (entidades en memoria)
@@ -230,9 +231,10 @@ lo trata como módulo sin API pública. No se crean fachadas ni interfaces (Prin
 | US4 llegar a la serie desde el volumen | `ProductControllerTests` (el detalle trae `series.id`) | `@WebMvcTest` |
 | US5 género sin publicados no aparece; autor con solo no publicados no aparece; orden alfabético; 4 clasificaciones | `ClassificationRepositoryIT` | `@DataJpaTest` + Testcontainers |
 | US6 acceso sin token; mismo catálogo para CUSTOMER y ADMIN | `CatalogSecurityIT` | `@SpringBootTest` |
-| Edge: producto con varios autores no se duplica; texto vacío = sin búsqueda; ID de clasificación inexistente → vacía; orden estable | `ProductSearchIT` | `@DataJpaTest` |
+| FR-005/FR-007/FR-020 dentro de los escenarios de US2: varias palabras en cualquier orden, parcial, ISBN con y sin guiones, producto con varios autores sin duplicar, no publicados nunca visibles | `ProductSearchIT` | `@DataJpaTest` |
+| Edge: paginación inválida (`size=0`, `page=-1`) e identificador de filtro mal formado (`genreId=abc`) | `ProductControllerTests` (filas extra del parametrizado de US2 «Parámetros inválidos») | `@WebMvcTest` |
 | Sin N+1 (IV) | `ProductQueryServiceIT`: estadísticas de Hibernate, número de sentencias constante para páginas de 1 y de 20 | servicio |
-| Restricciones de V3 (FR-015..FR-018) | `CatalogConstraintsIT`: ISBN duplicado, volumen duplicado en la serie, serie sin volumen y volumen sin serie, tipo inválido, precio ≤ 0 → violación de restricción | `@DataJpaTest` + Testcontainers |
+| Restricciones de V3 (FR-015..FR-018) | Sin test propio (opcional, VI): las protege V3 y las invariantes de `Money`/`Isbn` tienen sus tests unitarios obligatorios. Excluidos también los casos borde sin escenario (escape de `%`/`_`, términos de 1–2 caracteres, texto en blanco) | — |
 
 ### Mocks y dobles permitidos
 
@@ -264,7 +266,9 @@ El criterio de rendimiento (p95 < 500 ms con 10.000 productos) se verifica a man
   2. En `handleMethodArgumentNotValid`, un `FieldError` que sea fallo de enlace
      (`isBindingFailure()`: `type=XYZ`, `genreId=abc`, `page=abc`) usa un texto fijo en vez del
      mensaje de conversión de Spring, que incluye el valor y el tipo Java.
-  Ambos casos tienen test en `GlobalExceptionHandlerTests`.
+  Ambos casos se prueban a través de los escenarios que los exigen (`ProductControllerTests`:
+  `type=XYZ`, `genreId=abc` y UUID de ruta mal formado), sin tests propios en
+  `GlobalExceptionHandlerTests` (serían opcionales, VI).
 - **OpenAPI**: los controladores de `catalog` se anotan sin requisito de seguridad
   (`@SecurityRequirements`), porque `OpenApiConfiguration` aplica `bearerAuth` globalmente.
 - **Migraciones**: V1 y V2 no se tocan.

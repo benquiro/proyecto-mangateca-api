@@ -16,7 +16,7 @@ info:
     - Precios en pesos chilenos (CLP), enteros, sin decimales.
     - Todo listado es paginado: `page` desde 0 (maximo 1000000), `size` por defecto 20 y
       maximo 100 (mayor => 400, no se ajusta en silencio).
-    - Los listados devuelven `PagedModel`: `content` y `page` (`size`, `number`,
+    - Los listados devuelven una pagina (`PageResponse`): `content` y `page` (`size`, `number`,
       `totalElements`, `totalPages`). Una pagina fuera de rango devuelve `content` vacio.
     - Los errores son `application/problem+json` (RFC 9457).
     - Se ignora cualquier `Authorization` en estas rutas: el catalogo es identico para todos.

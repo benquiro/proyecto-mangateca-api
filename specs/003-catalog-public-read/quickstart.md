@@ -18,7 +18,7 @@ Contrato HTTP: [contracts/openapi.yaml](contracts/openapi.yaml). Esquema e índi
 
 Esperado: compila sin advertencias y pasan los tests de 001 y 002 más los de `catalog`:
 `MoneyTests`, `IsbnTests`, `ProductSearchIT`, `ClassificationRepositoryIT`,
-`CatalogConstraintsIT`, `ProductQueryServiceIT`, `ClassificationQueryServiceIT`,
+`ProductQueryServiceIT`, `ClassificationQueryServiceIT`,
 `ProductControllerTests`, `SeriesControllerTests`,
 `ClassificationControllerTests`, `CatalogSecurityIT` y `ModularityTests` (ver «Testing» en
 [plan.md](plan.md)).
@@ -151,5 +151,5 @@ feature por terminada; no se añade caché (Principio VII).
 
 Con la aplicación en marcha, contrastar `GET /v3/api-docs` con
 [contracts/openapi.yaml](contracts/openapi.yaml): rutas, parámetros (`page`, `size`, `sort`,
-filtros), códigos de respuesta, esquemas de `PagedModel`, `security: []` en las 8 operaciones y
+filtros), códigos de respuesta, esquemas de página (`content` + `page`), `security: []` en las 8 operaciones y
 los textos de los ejemplos. Las divergencias aceptadas están listadas al inicio del contrato.
