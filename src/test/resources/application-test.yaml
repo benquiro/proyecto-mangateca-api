@@ -1,0 +1,7 @@
+mangateca:
+  identity:
+    jwt:
+      issuer: mangateca-test
+spring:
+  jpa:
+    show-sql: false

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,9 +20,15 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import org.springframework.web.ErrorResponseException;
+import org.springframework.web.context.request.ServletWebRequest;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -185,6 +192,28 @@ class GlobalExceptionHandlerTests {
 					&& (line.contains("\"level\":\"ERROR\"") || line.contains(" ERROR "))))
 			.as("la excepcion se registra en nivel ERROR")
 			.isTrue();
+	}
+
+	@Test
+	@DisplayName("FR-020 / research R10: ProblemDetail con type propio conserva type y detail y solo normaliza title e instance")
+	void shouldKeepCustomTypeAndDetailWhenProblemDetailHasCustomType() {
+		GlobalExceptionHandler handler = new GlobalExceptionHandler();
+		URI customType = URI.create("urn:mangateca:error:test");
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "detalle de dominio");
+		problem.setType(customType);
+		problem.setTitle("titulo de dominio");
+		MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/probes");
+
+		ResponseEntity<Object> response = handler.handleExceptionInternal(new ErrorResponseException(
+				HttpStatus.CONFLICT, problem, null), null, new HttpHeaders(), HttpStatus.CONFLICT,
+				new ServletWebRequest(request));
+
+		assertThat(response.getBody()).isInstanceOfSatisfying(ProblemDetail.class, body -> {
+			assertThat(body.getType()).isEqualTo(customType);
+			assertThat(body.getDetail()).isEqualTo("detalle de dominio");
+			assertThat(body.getTitle()).isEqualTo("Conflict");
+			assertThat(body.getInstance()).isEqualTo(URI.create("/api/v1/probes"));
+		});
 	}
 
 	private static String body(MvcTestResult result) {

@@ -1,0 +1,319 @@
+# Verificacion T062 (2026-11-05): contrastado con GET /v3/api-docs (perfil dev) en rutas, metodos,
+# codigos de respuesta, tipos de contenido, esquemas de request/response, nombres JSON
+# (access_token, token_type, expires_in), esquema de seguridad bearerAuth, cookie refresh_token
+# (entrada y Set-Cookie) y textos `detail` de los ejemplos. Divergencias aceptadas, por diseno:
+#  - info/servers/tags: el documento generado es de toda la API (titulo "Mangateca API"); este
+#    contrato es solo del modulo identity.
+#  - ProblemDetail: el esquema generado es el de Spring (campo `properties` como mapa libre,
+#    `instance` con format uri, sin `required`). En runtime las extensiones se aplanan en el
+#    nivel raiz (p. ej. `errors`), tal como describe este contrato.
+#  - Seguridad: el generado declara bearerAuth global y `security: []` en operaciones publicas;
+#    equivalente a este contrato.
+openapi: 3.1.0
+info:
+  title: Mangateca API - Identity & Access
+  version: 0.1.0
+  description: |
+    Registro, inicio de sesion, renovacion, cierre de sesion e identidad actual.
+
+    - El token de acceso (JWT RS256, 15 min) viaja en `Authorization: Bearer`.
+    - El token de renovacion es opaco y viaja SOLO en la cookie `refresh_token`
+      (`HttpOnly; Secure; SameSite; Path=/api/v1/auth`); nunca en el cuerpo.
+    - Todos los errores son `application/problem+json` (RFC 9457).
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Auth
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Registrar un cliente (rol CUSTOMER)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Cuenta creada. No inicia sesion.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: El correo ya esta en uso (tipo `email-already-in-use`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: urn:mangateca:problem:email-already-in-use
+                title: Conflict
+                status: 409
+                detail: El correo ya está en uso.
+                instance: /api/v1/auth/register
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Iniciar sesion
+      description: |
+        Las credenciales incorrectas, el correo inexistente, la cuenta bloqueada y la cuenta
+        deshabilitada producen la MISMA respuesta (mismo estado, tipo y detalle).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Sesion iniciada. El token de renovacion llega en `Set-Cookie`.
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshSetCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: "Cuerpo invalido: `email` o `password` vacios o ausentes."
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Credenciales invalidas (tipo `invalid-credentials`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: urn:mangateca:problem:invalid-credentials
+                title: Unauthorized
+                status: 401
+                detail: Credenciales inválidas.
+                instance: /api/v1/auth/login
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refresh
+      summary: Renovar la sesion (rotacion del token de renovacion)
+      description: |
+        Lee el token de la cookie `refresh_token`. Cada uso lo invalida y entrega uno nuevo en
+        la misma familia. Reutilizar un token ya rotado revoca toda la familia.
+      security: []
+      parameters:
+        - name: refresh_token
+          in: cookie
+          required: false
+          description: Token de renovacion. Su ausencia produce el mismo 401 que un token invalido.
+          schema:
+            type: [string, 'null']
+      responses:
+        '200':
+          description: Nuevo token de acceso; nueva cookie de renovacion en `Set-Cookie`.
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshSetCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Token ausente, desconocido, expirado, reutilizado o usuario deshabilitado (tipo `invalid-refresh-token`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: urn:mangateca:problem:invalid-refresh-token
+                title: Unauthorized
+                status: 401
+                detail: Token de renovación inválido.
+                instance: /api/v1/auth/refresh
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Cerrar sesion
+      description: |
+        Publico e idempotente: responde 204 con cookie ausente, desconocida o expirada.
+        Revoca toda la familia del token recibido y borra la cookie.
+      security: []
+      parameters:
+        - name: refresh_token
+          in: cookie
+          required: false
+          description: Token de renovacion. Su ausencia o invalidez tambien produce 204.
+          schema:
+            type: [string, 'null']
+      responses:
+        '204':
+          description: Sesion cerrada (o no existia). La cookie se borra con `Max-Age=0`.
+          headers:
+            Set-Cookie:
+              description: Borrado de la cookie `refresh_token` (`Max-Age=0`).
+              schema:
+                type: string
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      operationId: me
+      summary: Identidad actual
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Datos de la cuenta autenticada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Sin token, expirado o invalido (formato de la plataforma, `WWW-Authenticate: Bearer`).
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+                example: Bearer
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  headers:
+    RefreshSetCookie:
+      description: |
+        `refresh_token=<43 caracteres base64url>; Path=/api/v1/auth; Max-Age=604800; HttpOnly;
+        Secure; SameSite=Strict`
+      schema:
+        type: string
+  responses:
+    ValidationError:
+      description: Validacion fallida (incluye enviar `role`, o una contrasena fuera de politica).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: about:blank
+            title: Bad Request
+            status: 400
+            detail: La petición contiene campos inválidos.
+            instance: /api/v1/auth/register
+            errors:
+              - field: password
+                message: debe tener entre 8 y 64 caracteres
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, displayName, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Se recorta y se compara sin distinguir capitalizacion.
+          example: ana@example.com
+        displayName:
+          type: string
+          maxLength: 100
+          description: Longitud valida tras recortar espacios.
+          example: Ana
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 64
+          description: 8-64 caracteres y como maximo 72 bytes en UTF-8.
+          writeOnly: true
+        role:
+          description: Debe estar ausente o ser null. Cualquier valor produce 400.
+          type: [string, 'null']
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          minLength: 1
+          example: ana@example.com
+        password:
+          type: string
+          format: password
+          minLength: 1
+          writeOnly: true
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token:
+          type: string
+          description: JWT RS256 con claims `sub`, `roles`, `iss`, `iat`, `exp`.
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in:
+          type: integer
+          description: Segundos hasta la expiracion.
+          example: 900
+    UserResponse:
+      type: object
+      required: [id, email, displayName, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [CUSTOMER, ADMIN]
+    ProblemDetail:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: |
+            `about:blank` o uno de `urn:mangateca:problem:email-already-in-use`,
+            `urn:mangateca:problem:invalid-credentials`,
+            `urn:mangateca:problem:invalid-refresh-token`.
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+        errors:
+          type: array
+          description: Solo en validacion.
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string

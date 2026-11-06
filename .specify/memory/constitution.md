@@ -1,3 +1,21 @@
+<!--
+Sync Impact Report
+- Versión: 3.0.0 -> 4.0.0 (MAJOR: relaja de forma acotada reglas MUST de IV, V y VI)
+- Principios modificados (sin renombrar):
+  - IV. Persistencia y Contrato de API: excepción acotada de verbos de acción en /api/v1/auth/
+  - V. Seguridad por Defecto: acceso anónimo ampliado a register, login, refresh y logout
+  - VI. Calidad Verificable: los mocks se permiten también en repositorios y, en tests de slice
+    web (@WebMvcTest), en la capa de aplicación del módulo bajo prueba
+- Secciones añadidas: ninguna. Secciones eliminadas: ninguna.
+- Plantillas: las plantillas de Spec Kit leen la constitución en tiempo de ejecución; no se
+  modifican.
+- Artefactos afectados: specs/002-identity-access/plan.md (la fila ❌ del Constitution Check sobre
+  acceso anónimo y la entrada de Complexity Tracking sobre verbos quedan resueltas; rehacer el
+  Constitution Check con la versión 4.0.0). Agente spring-test: alinear con el alcance de tests
+  de VI.
+- TODOs diferidos: ninguno.
+-->
+
 # Constitución de Mangateca API
 
 Palabras clave MUST, MUST NOT, SHOULD, SHOULD NOT, MAY según RFC 2119.
@@ -56,7 +74,10 @@ Palabras clave MUST, MUST NOT, SHOULD, SHOULD NOT, MAY según RFC 2119.
 - **Contrato HTTP**:
   - Entidades JPA MUST NOT exponerse fuera de su módulo ni en HTTP; entrada/salida MUST usar DTOs
     `record` mapeados con MapStruct.
-  - Rutas MUST versionarse bajo `/api/v1` con sustantivos en plural.
+  - Rutas MUST versionarse bajo `/api/v1` con sustantivos en plural. Excepción acotada: los
+    endpoints de autenticación bajo `/api/v1/auth/` MAY usar verbos de acción (`login`,
+    `refresh`, `logout`), por ser la convención estándar de la industria. Ningún otro recurso
+    MAY acogerse a esta excepción.
   - Errores MUST unificarse en un `@RestControllerAdvice` que retorne `ProblemDetail` (RFC 9457);
     stack traces, mensajes internos y detalles SQL MUST NOT exponerse.
   - Todo listado MUST paginarse con tamaño máximo de página.
@@ -76,7 +97,10 @@ Palabras clave MUST, MUST NOT, SHOULD, SHOULD NOT, MAY según RFC 2119.
 - `SecurityFilterChain` MUST ser deny-by-default; autorización de negocio MUST reforzarse con
   `@PreAuthorize` a nivel de método.
 - Roles MUST ser `CUSTOMER` y `ADMIN`. Acceso anónimo MUST limitarse a lectura de catálogo y
-  reseñas públicas.
+  reseñas públicas, y a los endpoints de entrada de la autenticación: `POST /api/v1/auth/register`,
+  `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh` y `POST /api/v1/auth/logout`, que no
+  pueden exigir un token de acceso que aún no existe. Cualquier otro endpoint anónimo MUST NOT
+  añadirse sin enmienda.
 - Un usuario MUST NOT leer ni modificar recursos de otro (anti IDOR/BOLA); la identidad MUST
   obtenerse del token, nunca de parámetros del cliente.
 
@@ -96,7 +120,8 @@ Palabras clave MUST, MUST NOT, SHOULD, SHOULD NOT, MAY según RFC 2119.
 - **Herramientas** (cuando se escriba el test): web/autorización con `@WebMvcTest`, consultas con
   `@DataJpaTest`. Tests con BD MUST usar Testcontainers PostgreSQL vía `@ServiceConnection`; BD en
   memoria (H2, etc.) MUST NOT.
-- Mocks MUST restringirse a fronteras de I/O externas (pasarela simulada, `Clock`); entidades,
+- Mocks MUST restringirse a fronteras de I/O (repositorios, pasarela simulada, `Clock`) y, en
+  tests de slice web (`@WebMvcTest`), a la capa de aplicación del módulo bajo prueba; entidades,
   records y VOs MUST NOT mockearse.
 - Compilación MUST tener cero advertencias con `-Xlint:all` y `failOnWarning`, tratadas como
   errores. Única excepción permitida: la categoría `processing` (`-Xlint:all,-processing`),
@@ -158,4 +183,4 @@ Palabras clave MUST, MUST NOT, SHOULD, SHOULD NOT, MAY según RFC 2119.
 - **Cumplimiento**: toda revisión de código (humana o agente `spec-reviewer`) MUST verificar esta
   Constitución; toda complejidad adicional MUST justificarse en `plan.md` según VII.
 
-**Versión**: 3.0.0 | **Estado**: Activo | **Ratificada**: 2026-11-05 | **Última enmienda**: 2026-11-05
+**Versión**: 4.0.0 | **Estado**: Activo | **Ratificada**: 2026-11-05 | **Última enmienda**: 2026-11-05

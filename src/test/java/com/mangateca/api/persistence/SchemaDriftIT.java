@@ -68,7 +68,9 @@ class SchemaDriftIT {
 		execute("""
 				INSERT INTO flyway_schema_history
 				  (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)
-				VALUES (2, '999', 'future', 'SQL', 'V999__future.sql', 123, 'test', 0, true)
+				SELECT COALESCE(MAX(installed_rank), 0) + 1, '999', 'future', 'SQL', 'V999__future.sql', 123,
+				  'test', 0, true
+				FROM flyway_schema_history
 				""");
 		Snapshot before = snapshot();
 

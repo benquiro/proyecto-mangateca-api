@@ -44,8 +44,40 @@ Fuera de dev, la configuración llega por variables de entorno:
 | `SPRING_DATASOURCE_URL` | Sí | `jdbc:postgresql://db:5432/mangateca` | El arranque falla |
 | `SPRING_DATASOURCE_USERNAME` | Sí | `mangateca` | El arranque falla |
 | `SPRING_DATASOURCE_PASSWORD` | Sí | *(secreto)* | El arranque falla |
-| `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION` | Sí | `file:/run/secrets/jwt-public.pem` | El arranque falla (no hay `JwtDecoder`) |
 | `MANGATECA_CORS_ALLOWED_ORIGINS` | No | `https://app.example.com,https://admin.example.com` | Vacía: ningún origen cruzado permitido. Con `*` o un valor que no sea `scheme://host[:port]`, la aplicación no arranca |
+
+## Identidad y claves
+
+En `dev` y `test`, si no se define ninguna ruta de clave, la aplicación genera un par RSA 2048
+efímero en memoria: los tokens dejan de ser válidos al reiniciar. Fuera de esos perfiles las
+claves son obligatorias y, si faltan, el arranque falla. La variable
+`SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION` ya no se usa (ADR-006).
+
+| Variable | Obligatoria | Ejemplo | Notas |
+|----------|-------------|---------|-------|
+| `MANGATECA_IDENTITY_JWT_ISSUER` | Sí (fuera de dev/test) | `https://<host-publico-de-la-api>` | Se escribe en `iss` y lo exige el decodificador |
+| `MANGATECA_IDENTITY_JWT_PRIVATE_KEY_LOCATION` | Sí (fuera de dev/test) | `file:/run/secrets/jwt-private.pem` | PEM PKCS#8 |
+| `MANGATECA_IDENTITY_JWT_PUBLIC_KEY_LOCATION` | Sí (fuera de dev/test) | `file:/run/secrets/jwt-public.pem` | PEM X.509; debe formar par con la privada |
+
+Generar el par (fuera del repositorio; guárdalo en el gestor de secretos del despliegue):
+
+```bash
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt-private.pem
+openssl rsa -in jwt-private.pem -pubout -out jwt-public.pem
+```
+
+`genpkey` produce la clave privada en PKCS#8 (`BEGIN PRIVATE KEY`) y `-pubout` la pública en
+X.509 (`BEGIN PUBLIC KEY`).
+
+### Administrador inicial (opcional)
+
+| Variable | Ejemplo |
+|----------|---------|
+| `MANGATECA_IDENTITY_BOOTSTRAP_ADMIN_EMAIL` | `<email-del-administrador>` |
+| `MANGATECA_IDENTITY_BOOTSTRAP_ADMIN_PASSWORD` | `<contraseña-secreta>` (8–64 caracteres, máx. 72 bytes) |
+
+Si faltan o son inválidas, la aplicación arranca igualmente sin crear el administrador y emite
+un aviso sin datos sensibles. Nunca versiones valores reales.
 
 ## Pruebas
 

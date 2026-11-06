@@ -1,7 +1,29 @@
 # ADR-003: Autenticación stateless con OAuth2 Resource Server (JWT)
 
-- **Estado**: Aceptado
+- **Estado**: Reemplazado parcialmente por ADR-006 (Superseded in part by ADR-006)
 - **Fecha**: 2026-11-05
+
+## Reemplazo parcial
+
+ADR-006 (emisión propia de tokens) reemplaza parcialmente esta decisión desde la feature 002.
+
+**Reemplazado por ADR-006**:
+
+- El origen de la clave pública mediante `spring.security.oauth2.resourceserver.jwt.public-key-location`
+  (y su variable `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION`). Ahora el par de
+  claves y el `JwtDecoder` pertenecen a `identity` y se configuran con `MANGATECA_IDENTITY_JWT_*`.
+- `DevJwtDecoderConfiguration` (decoder efímero solo en `dev`). Se retira: `identity` genera el par
+  efímero en `dev` y `test`.
+- La nota «esta feature no emite tokens»: a partir de la feature 002 la API emite sus propios JWT.
+
+**Sigue vigente**:
+
+- Resource Server nativo de Spring Security.
+- Firma RS256.
+- El starter `spring-boot-starter-security-oauth2-resource-server`.
+- Ninguna librería JWT de terceros.
+
+El resto del texto se conserva como registro histórico de la feature 001.
 
 ## Contexto y problema
 
@@ -55,10 +77,10 @@ Verificado el 2026-11-05 en Maven Central (`repo1.maven.org/maven2/org/springfra
 
 ## Consecuencias
 
-- **Clave pública obligatoria fuera de dev**: `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION`
+- **Clave pública obligatoria fuera de dev** (histórico, ver Reemplazo parcial): `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION`
   (clave pública RSA, p. ej. `file:/run/secrets/jwt-public.pem`). Si falta no existe un
   `JwtDecoder` y el arranque falla (fail-fast).
-- **Perfil `dev`**: `JwtDecoder` construido con un par RSA efímero generado en memoria al
+- **Perfil `dev`** (histórico, ver Reemplazo parcial): `JwtDecoder` construido con un par RSA efímero generado en memoria al
   arrancar. No hay claves en el repositorio y los tokens de dev quedan inválidos en cada
   reinicio; es aceptable porque la emisión está fuera de alcance.
 - **Tests**: `TestSecurityConfiguration` genera un par RSA efímero y expone `JwtDecoder` y
@@ -73,4 +95,4 @@ Verificado el 2026-11-05 en Maven Central (`repo1.maven.org/maven2/org/springfra
   lugar de 401, lo que incumple SC-004 y FR-020.
 - **Deuda registrada**: `allowCredentials=true` (CORS) prepara la cookie del refresh token. El
   módulo `identity` MUST reevaluar la protección CSRF del endpoint de refresh antes de emitir
-  cookies (p. ej. `SameSite=Strict` y CSRF activo solo en esa ruta).
+  cookies (p. ej. `SameSite=Strict` y CSRF activo solo en esa ruta). Ver ADR-006, Consecuencias.

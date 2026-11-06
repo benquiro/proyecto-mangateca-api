@@ -42,6 +42,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
 	private static final String INTERNAL_ERROR_DETAIL = "Se produjo un error interno.";
 
+	private static final URI ABOUT_BLANK = URI.create("about:blank");
+
 	private static final String ERRORS_PROPERTY = "errors";
 
 	/** Elemento de la propiedad de extension {@code errors}. */
@@ -94,10 +96,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			effectiveBody = errorResponse.getBody();
 		}
 		if (effectiveBody instanceof ProblemDetail problem) {
+			// Un type distinto de about:blank conserva type y detail; solo se normalizan title e instance.
+			// El tipo por defecto de Spring puede ser null, "" o "about:blank"; se compara por toString().
+			URI type = problem.getType();
+			boolean customType = type != null && !type.toString().isEmpty()
+					&& !ABOUT_BLANK.toString().equals(type.toString());
+			String detail = problem.getDetail();
 			normalize(problem, statusCode, requestPath(request));
-			Object errors = problem.getProperties() == null ? null : problem.getProperties().get(ERRORS_PROPERTY);
-			if (errors == null) {
-				problem.setDetail(detailFor(statusCode));
+			if (customType) {
+				problem.setType(type);
+				problem.setDetail(detail);
+			}
+			else {
+				Object errors = problem.getProperties() == null ? null : problem.getProperties().get(ERRORS_PROPERTY);
+				if (errors == null) {
+					problem.setDetail(detailFor(statusCode));
+				}
 			}
 		}
 		return super.handleExceptionInternal(ex, effectiveBody, headers, statusCode, request);

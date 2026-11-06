@@ -65,12 +65,13 @@ class FlywayMigrationIT {
 	}
 
 	@Test
-	@DisplayName("FR-006: sin tablas de negocio en el esquema public")
+	@DisplayName("FR-006: sin tablas de negocio ajenas a plataforma e identidad (V2) en el esquema public")
 	void shouldNotCreateBusinessTables() {
 		List<String> tables = jdbc.queryForList(
 				"SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'", String.class);
 
-		assertThat(tables).containsExactlyInAnyOrder("flyway_schema_history", "event_publication");
+		assertThat(tables).containsExactlyInAnyOrder("flyway_schema_history", "event_publication", "users",
+				"refresh_tokens");
 	}
 
 	@Test

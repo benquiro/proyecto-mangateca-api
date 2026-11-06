@@ -7,7 +7,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -25,16 +24,13 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
-import org.springframework.security.oauth2.jwt.JwsHeader;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.web.servlet.client.EntityExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
 import com.mangateca.api.TestSecurityConfiguration;
+import com.mangateca.api.TestSecurityConfiguration.TestTokens;
 import com.mangateca.api.TestcontainersConfiguration;
 
 /**
@@ -52,7 +48,7 @@ class SecurityIT {
 	private RestTestClient client;
 
 	@Autowired
-	private JwtEncoder jwtEncoder;
+	private TestTokens tokens;
 
 	@Test
 	@DisplayName("FR-019 / US3 escenario 1: GET sin token a ruta protegida responde 401")
@@ -101,6 +97,20 @@ class SecurityIT {
 			.isEqualTo(malformed.getResponseHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE));
 		assertThat(expired.getResponseHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
 			.isEqualTo(malformed.getResponseHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE));
+	}
+
+	@Test
+	@DisplayName("FR-008 / research R3: token firmado con la clave correcta pero iss ajeno responde 401")
+	void shouldReturn401WhenIssuerIsForeign() {
+		EntityExchangeResult<String> foreignIssuer = get(PROBES, foreignIssuerToken());
+		EntityExchangeResult<String> malformed = get(PROBES, "x.y.z");
+
+		assertThat(foreignIssuer.getStatus().value()).isEqualTo(401);
+		assertThat(foreignIssuer.getResponseHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
+			.startsWith("Bearer")
+			.doesNotContain("error_description")
+			.isEqualTo(malformed.getResponseHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE));
+		assertProblemDetails(foreignIssuer, 401, "/api/v1/probes");
 	}
 
 	@Test
@@ -202,26 +212,23 @@ class SecurityIT {
 	}
 
 	private String token(List<String> roles, long issuedHoursFromNow, long expiresHoursFromNow) {
-		return encode(this.jwtEncoder, roles, issuedHoursFromNow, expiresHoursFromNow);
+		Instant now = Instant.now();
+		return this.tokens.token("user-1", roles, now.plus(issuedHoursFromNow, ChronoUnit.HOURS),
+				now.plus(expiresHoursFromNow, ChronoUnit.HOURS));
+	}
+
+	private String foreignIssuerToken() {
+		Instant now = Instant.now();
+		return this.tokens.tokenWithIssuer("https://otro-emisor.example", "user-1", List.of("ADMIN"), now,
+				now.plus(1, ChronoUnit.HOURS));
 	}
 
 	private String foreignKeyToken() throws JOSEException {
 		RSAKey other = new RSAKeyGenerator(2048).keyID("otra-clave").generate();
 		JwtEncoder foreign = new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(other)));
-		return encode(foreign, List.of("ADMIN"), 0, 1);
-	}
-
-	private static String encode(JwtEncoder encoder, List<String> roles, long issuedHoursFromNow,
-			long expiresHoursFromNow) {
 		Instant now = Instant.now();
-		JwtClaimsSet claims = JwtClaimsSet.builder()
-			.subject("user-1")
-			.issuedAt(now.plus(issuedHoursFromNow, ChronoUnit.HOURS))
-			.expiresAt(now.plus(expiresHoursFromNow, ChronoUnit.HOURS))
-			.claims(map -> map.putAll(Map.of("roles", roles)))
-			.build();
-		JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
-		return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+		return TestTokens.encode(foreign, TestTokens.ISSUER, "user-1", List.of("ADMIN"), now,
+				now.plus(1, ChronoUnit.HOURS));
 	}
 
 }

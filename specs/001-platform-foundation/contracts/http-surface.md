@@ -61,6 +61,9 @@ Los textos exactos de `detail` los fija la implementación. Los tests MUST verif
   `Authorization, Content-Type`. El preflight no requiere token.
 - Origen no permitido: 403 Problem Details, sin cabeceras `Access-Control-Allow-*`.
 
+> **Actualización (feature 002, T019)**: un `ProblemDetail` con `type` distinto de `about:blank`
+> conserva su `type` y su `detail` originales; solo se normalizan los que traen `about:blank`.
+
 ## 5. Ejemplos
 
 ```http
