@@ -279,23 +279,23 @@ deja de renovar.
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T045 [P] [US3] [TEST] Crear `RefreshTokenServiceTests` en `src/test/java/com/mangateca/api/identity/application/RefreshTokenServiceTests.java`, unitario sin Spring, con mocks de `RefreshTokenRepository` y `UserRepository` y un `Clock` de test controlado. Casos:
+- [X] T045 [P] [US3] [TEST] Crear `RefreshTokenServiceTests` en `src/test/java/com/mangateca/api/identity/application/RefreshTokenServiceTests.java`, unitario sin Spring, con mocks de `RefreshTokenRepository` y `UserRepository` y un `Clock` de test controlado. Casos:
   - Rotación válida: se devuelve un token nuevo con el mismo `familyId`, y el anterior queda con `revokedAt` y `replacedBy` (Escenario 1, FR-012).
   - Presentar el token ya rotado lanza `InvalidRefreshTokenException` e invoca `revokeFamily(familyId, now)` (Escenario 2, FR-013, SC-005).
   - Tras `revoke` (logout), renovar con ese token lanza `InvalidRefreshTokenException` (Escenario 3, FR-014).
   - Logout con token desconocido o expirado (expirado avanzando el `Clock` 7 días) termina sin excepción (Escenario 4, FR-014).
-- [ ] T046 [P] [US3] [TEST] Crear `RefreshTokenRepositoryIT` en `src/test/java/com/mangateca/api/identity/domain/RefreshTokenRepositoryIT.java` con `@DataJpaTest`, `@AutoConfigureTestDatabase(replace = NONE)` y `@Import(TestcontainersConfiguration.class)`. Guarda 3 tokens de la familia A (uno ya revocado) y 1 de la familia B; `revokeFamily(A, now)` devuelve 2, revoca todos los de A y deja intacto el de B (Escenario 2 «todos los tokens de esa sesión quedan invalidados», FR-013).
-- [ ] T047 [US3] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/web/AuthControllerTests.java` los casos de refresh y logout:
+- [X] T046 [P] [US3] [TEST] Crear `RefreshTokenRepositoryIT` en `src/test/java/com/mangateca/api/identity/domain/RefreshTokenRepositoryIT.java` con `@DataJpaTest`, `@AutoConfigureTestDatabase(replace = NONE)` y `@Import(TestcontainersConfiguration.class)`. Guarda 3 tokens de la familia A (uno ya revocado) y 1 de la familia B; `revokeFamily(A, now)` devuelve 2, revoca todos los de A y deja intacto el de B (Escenario 2 «todos los tokens de esa sesión quedan invalidados», FR-013).
+- [X] T047 [US3] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/web/AuthControllerTests.java` los casos de refresh y logout:
   - Refresh con cookie → 200 `TokenResponse` y nueva `Set-Cookie` (Escenario 1).
   - Refresh sin cookie → 401 con `type=urn:mangateca:problem:invalid-refresh-token` (FR-020).
   - Logout sin cookie → 204, `Set-Cookie` con `Max-Age=0` y sin token de acceso (Escenario 4, FR-014, FR-019).
-- [ ] T048 [US3] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` el `@Nested Session` con el flujo feliz de refresh y logout: login → refresh 200 con cookie nueva → la cookie anterior da 401 → logout 204 → la cookie vigente da 401 al renovar (FR-012, FR-014).
+- [X] T048 [US3] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` el `@Nested Session` con el flujo feliz de refresh y logout: login → refresh 200 con cookie nueva → la cookie anterior da 401 → logout 204 → la cookie vigente da 401 al renovar (FR-012, FR-014).
 
 ### Implementation for User Story 3
 
-- [ ] T049 [US3] [CODE] Añadir a `src/main/java/com/mangateca/api/identity/domain/RefreshToken.java` los métodos `isExpired(Instant)`, `isRevoked()`, `rotate(UUID newTokenId, Instant now)` (fija `revokedAt` y `replacedBy`) y `revoke(Instant now)` (solo si no estaba revocado) (FR-012, FR-013, data-model §3).
-- [ ] T050 [P] [US3] [CODE] Crear `InvalidRefreshTokenException extends ErrorResponseException` en `src/main/java/com/mangateca/api/identity/application/InvalidRefreshTokenException.java`. `ProblemDetail` 401 con `type=urn:mangateca:problem:invalid-refresh-token` y `detail` constante «Token de renovación inválido.» (FR-013, FR-020, research R10).
-- [ ] T051 [US3] [CODE] Añadir `rotate(String token)` y `revoke(@Nullable String token)` a `src/main/java/com/mangateca/api/identity/application/RefreshTokenService.java`.
+- [X] T049 [US3] [CODE] Añadir a `src/main/java/com/mangateca/api/identity/domain/RefreshToken.java` los métodos `isExpired(Instant)`, `isRevoked()`, `rotate(UUID newTokenId, Instant now)` (fija `revokedAt` y `replacedBy`) y `revoke(Instant now)` (solo si no estaba revocado) (FR-012, FR-013, data-model §3).
+- [X] T050 [P] [US3] [CODE] Crear `InvalidRefreshTokenException extends ErrorResponseException` en `src/main/java/com/mangateca/api/identity/application/InvalidRefreshTokenException.java`. `ProblemDetail` 401 con `type=urn:mangateca:problem:invalid-refresh-token` y `detail` constante «Token de renovación inválido.» (FR-013, FR-020, research R10).
+- [X] T051 [US3] [CODE] Añadir `rotate(String token)` y `revoke(@Nullable String token)` a `src/main/java/com/mangateca/api/identity/application/RefreshTokenService.java`.
   - `rotate`: transacción `@Transactional(noRollbackFor = InvalidRefreshTokenException.class)`. Hashea y aplica `findByTokenHashForUpdate`; luego sigue los casos de research R7:
     - Inexistente → excepción.
     - Revocado → `revokeFamily` + WARN con `userId`/`familyId` + excepción.
@@ -305,7 +305,7 @@ deja de renovar.
   - `revoke`: si el token existe, `revokeFamily`; nunca lanza.
 
   Cubre FR-012, FR-013, FR-014 y FR-015.
-- [ ] T052 [US3] [CODE] Añadir a `src/main/java/com/mangateca/api/identity/web/AuthController.java` los endpoints `POST /refresh` y `POST /logout`, ambos con `@CookieValue(name = "refresh_token", required = false)`:
+- [X] T052 [US3] [CODE] Añadir a `src/main/java/com/mangateca/api/identity/web/AuthController.java` los endpoints `POST /refresh` y `POST /logout`, ambos con `@CookieValue(name = "refresh_token", required = false)`:
   - `POST /refresh`: sin cookie → `InvalidRefreshTokenException`; con cookie → 200 con `TokenResponse` y nueva cookie.
   - `POST /logout`: siempre 204 con `RefreshCookieFactory.clear()`.
 
