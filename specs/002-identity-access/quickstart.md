@@ -23,6 +23,8 @@ tests de 001 y los de `identity`: `ModularityTests`, `ApiApplicationTests`, `Use
 
 ## 2. Arranque local con administrador inicial
 
+> Verificado a mano 2026-11-05 (T065).
+
 ```bash
 MANGATECA_IDENTITY_BOOTSTRAP_ADMIN_EMAIL=admin@example.com \
 MANGATECA_IDENTITY_BOOTSTRAP_ADMIN_PASSWORD='cambiar-esta-clave-1' \
@@ -34,16 +36,20 @@ Esperado:
 - Arranca con el perfil `dev`, sin variables de claves.
 - Log INFO de par RSA efímero de desarrollo, sin material de clave.
 - Flyway aplica V2.
-- Log INFO con el `userId` del administrador creado. **La contraseña no aparece en ningún log.**
+- Log INFO con el `userId` del administrador creado (solo en el primer arranque; en los siguientes no se
+  emite ningún log). **La contraseña no aparece en ningún log.**
+- No aparece el log «Using generated security password» (research R9).
 
 Reinicia con las mismas variables y comprueba que no se crea otro administrador (SC-007):
 
 ```bash
-docker compose exec postgres psql -U <usuario> -d <base> \
+docker compose exec postgres psql -U mangateca -d mangateca \
   -c "select count(*) from users where role = 'ADMIN';"   # 1
 ```
 
 ## 3. Flujo de cliente
+
+> Verificado a mano 2026-11-05 (T065): 3a a 3f y payload del JWT.
 
 `localhost` cuenta como contexto seguro, así que `curl` conserva la cookie `Secure` en el archivo
 de cookies.
@@ -63,8 +69,9 @@ curl -s -i -X POST $BASE/register -H 'Content-Type: application/json' \
 curl -s -i -X POST $BASE/register -H 'Content-Type: application/json' \
   -d '{"email":"mal@example.com","displayName":"Mal","password":"contrasena-segura-1","role":"ADMIN"}'
 
-# 3d. Contraseña de 64 caracteres de 4 bytes (256 bytes > 72) → 400 errors[field=password]
-PW=$(printf '😀%.0s' $(seq 1 64))
+# 3d. Contraseña de 30 emojis (60 caracteres, 120 bytes > 72) → 400 errors[field=password]
+#     (con 64 emojis también da 400, pero por longitud en caracteres y no por el límite de bytes)
+PW=$(printf '😀%.0s' $(seq 1 30))
 curl -s -i -X POST $BASE/register -H 'Content-Type: application/json' \
   -d "{\"email\":\"emoji@example.com\",\"displayName\":\"Emoji\",\"password\":\"$PW\"}"
 
@@ -79,10 +86,13 @@ curl -s $BASE/me -H "Authorization: Bearer $ACCESS"
 curl -s -i $BASE/me
 ```
 
-Revisa el payload del JWT (`echo $ACCESS | cut -d. -f2 | base64 -d`). Debe traer `sub` (UUID),
+Revisa el payload del JWT (`echo $ACCESS | cut -d. -f2 | tr '_-' '/+' | base64 -d`; el JWT usa
+base64url sin relleno, así que `base64 -d` puede avisar de entrada incompleta). Debe traer `sub` (UUID),
 `roles` (`["CUSTOMER"]`), `iss` (el de `application-dev.yaml`), `iat` y `exp = iat + 900`.
 
 ## 4. Renovación, reutilización y cierre de sesión
+
+> Verificado a mano 2026-11-05 (T065): 4a a 4d y hashes en base de datos.
 
 ```bash
 cp jar.txt old.txt
@@ -99,13 +109,16 @@ curl -s -i -X POST $BASE/logout
 Comprueba en la base de datos que no hay tokens en claro:
 
 ```bash
-docker compose exec postgres psql -U <usuario> -d <base> \
+docker compose exec postgres psql -U mangateca -d mangateca \
   -c "select family_id, encode(token_hash,'hex') as hash, revoked_at, replaced_by from refresh_tokens;"
 ```
 
 Esperado: hashes de 64 caracteres hexadecimales; ninguna columna contiene el valor de la cookie.
 
 ## 5. Bloqueo por fuerza bruta (SC-004)
+
+> Verificado a mano 2026-11-05 (T065): 401 x5, sexto intento correcto 401, cuerpo idéntico al de un
+> correo inexistente.
 
 ```bash
 for i in 1 2 3 4 5; do
@@ -122,11 +135,17 @@ Compara el cuerpo de este 401 con el de un correo inexistente: deben coincidir `
 
 ## 6. Roles (US4, FR-021)
 
+> Verificado a mano 2026-11-05 (T065): el login del administrador devuelve `roles: ["ADMIN"]`. El 403
+> para `CUSTOMER` lo cubre `AuthFlowIT` (no hay endpoint protegido por rol que probar a mano).
+
 El administrador inicia sesión con las credenciales del paso 2 y su token lleva
 `roles: ["ADMIN"]`. `AuthFlowIT` comprueba que un `CUSTOMER` recibe 403 en un recurso con
 `@PreAuthorize("hasRole('ADMIN')")`.
 
 ## 7. Arquitectura y contrato
+
+> Verificado a mano 2026-11-05 (T065): `GET /v3/api-docs` lista register (201/400/409), login
+> (200/400/401), refresh (200/401), logout (204) y me (200/401). `ModularityTests` lo ejecuta `verify`.
 
 - `ModularityTests` pasa: la raíz de `identity` solo expone `UserRegistered` y `Role`.
 - `GET /v3/api-docs` lista las 5 rutas de `/api/v1/auth` con los mismos códigos de estado y
@@ -134,15 +153,29 @@ El administrador inicia sesión con las credenciales del paso 2 y su token lleva
 
 ## 8. Claves fuera de dev/test
 
+> Verificado a mano 2026-11-05 (T065) con un par RSA generado fuera del repositorio.
+
 ```bash
 ./mvnw -q package -DskipTests
-# Sin perfil y sin claves → el arranque falla nombrando las variables que faltan
+# Sin perfil, con la base configurada y sin claves → el arranque falla nombrando las variables que
+# faltan (sin las variables de datasource falla antes, por la base de datos)
+export SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:<puerto>/mangateca \
+  SPRING_DATASOURCE_USERNAME=mangateca SPRING_DATASOURCE_PASSWORD=<clave>
 java -jar target/api-0.0.1-SNAPSHOT.jar
-# Con un par que no corresponde (pública de otro par) → el arranque falla
+# Con un par que no corresponde (pública de otro par) → el arranque falla:
+# «Las claves JWT privada y publica no forman un par RSA.»
+MANGATECA_IDENTITY_JWT_ISSUER=https://api.example.test \
+MANGATECA_IDENTITY_JWT_PRIVATE_KEY_LOCATION=file:/ruta/privada-a.pem \
+MANGATECA_IDENTITY_JWT_PUBLIC_KEY_LOCATION=file:/ruta/publica-b.pem \
+java -jar target/api-0.0.1-SNAPSHOT.jar
 ```
+
+El puerto de PostgreSQL es aleatorio: `docker compose port postgres 5432`. Con un par válido
+(`privada-a` + `publica-a`) la aplicación arranca y `/actuator/health` responde 200.
 
 Comprueba también que el repositorio no contiene claves:
 
 ```bash
-git grep -l "BEGIN .*PRIVATE KEY"     # sin resultados
+git grep -l -e "-----BEGIN [A-Z ]*PRIVATE KEY-----"     # sin resultados (el patrón sin guiones
+                                                      # coincide con texto de documentación)
 ```
