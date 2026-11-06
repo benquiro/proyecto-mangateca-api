@@ -24,6 +24,10 @@ Lo activa `./mvnw spring-boot:run`. No requiere variables.
 | `SPRING_DATASOURCE_PASSWORD`                                   | *(secreto)*                         | Arranque falla        |
 | `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION`| `file:/run/secrets/jwt-public.pem`  | Arranque falla (sin `JwtDecoder`) |
 
+> **Sustituida (feature 002, ADR-006)**: `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION`
+> ya no se usa; la sustituyen las variables `MANGATECA_IDENTITY_JWT_*` (issuer, private-key-location,
+> public-key-location). Ver `specs/002-identity-access/contracts/configuration.md`.
+
 ## Opcionales
 
 | Variable                              | Formato                                   | Por defecto |
