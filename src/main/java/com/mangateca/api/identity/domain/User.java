@@ -8,6 +8,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -79,6 +80,36 @@ public class User {
       throw new IllegalArgumentException("Display name must have 1 to 100 characters");
     }
     return new User(UUID.randomUUID(), email, name, passwordHash, role, clock.instant());
+  }
+
+  public static final int MAX_FAILED_ATTEMPTS = 5;
+  public static final Duration LOCK_DURATION = Duration.ofMinutes(15);
+
+  public boolean isLocked(Instant now) {
+    return lockedUntil != null && now.isBefore(lockedUntil);
+  }
+
+  public void registerFailedLogin(Instant now) {
+    if (isLocked(now)) {
+      this.updatedAt = now;
+      return;
+    }
+    if (lockedUntil != null) {
+      // bloqueo vencido: el ciclo de fallos comienza de nuevo
+      this.failedLoginAttempts = 0;
+      this.lockedUntil = null;
+    }
+    this.failedLoginAttempts++;
+    if (failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+      this.lockedUntil = now.plus(LOCK_DURATION);
+    }
+    this.updatedAt = now;
+  }
+
+  public void registerSuccessfulLogin(Instant now) {
+    this.failedLoginAttempts = 0;
+    this.lockedUntil = null;
+    this.updatedAt = now;
   }
 
   public void disable(Instant now) {
