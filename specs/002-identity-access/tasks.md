@@ -325,19 +325,19 @@ recursos.
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T053 [US4] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/web/AuthControllerTests.java` el caso de `/me` con `spring-security-test` (`SecurityMockMvcRequestPostProcessors.jwt()` con `subject` = UUID): 200 con el `UserResponse` del servicio mockeado y sin campos sensibles (Escenario 1, FR-016). El 401 sin token no se prueba aquí: en el slice no está la cadena deny-by-default de la plataforma, y lo cubre T055.
-- [ ] T054 [US4] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` el `@Nested Me`:
+- [X] T053 [US4] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/web/AuthControllerTests.java` el caso de `/me` con `spring-security-test` (`SecurityMockMvcRequestPostProcessors.jwt()` con `subject` = UUID): 200 con el `UserResponse` del servicio mockeado y sin campos sensibles (Escenario 1, FR-016). El 401 sin token no se prueba aquí: en el slice no está la cadena deny-by-default de la plataforma, y lo cubre T055.
+- [X] T054 [US4] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` el `@Nested Me`:
   - Dos usuarios registrados: cada token obtiene en `/me` solo sus propios datos (`id`, `email`, `displayName`, `role`; sin `password`/`passwordHash`) (Escenario 1, FR-016, anti IDOR).
   - Token acuñado con el helper de T014 y `exp` en el pasado → 401 ProblemDetail (Escenario 2).
-- [ ] T055 [US4] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` el `@Nested Security` (seguridad crítica):
+- [X] T055 [US4] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` el `@Nested Security` (seguridad crítica):
   - Las 4 rutas `POST /api/v1/auth/{register,login,refresh,logout}` sin token nunca devuelven el 401 del entry point de la plataforma (`type=about:blank` + `WWW-Authenticate: Bearer`). Sí pueden devolver los 401 propios de `identity`; por ejemplo, `refresh` sin cookie da `type=urn:mangateca:problem:invalid-refresh-token` sin `WWW-Authenticate` (FR-019).
   - `GET /api/v1/auth/me` y `GET /api/v1/auth/inexistente` sin token → 401 del entry point (`about:blank` + `WWW-Authenticate: Bearer`) (Escenario 3, deny-by-default).
-- [ ] T056 [US4] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` el `@Nested Roles`. Con el access token **real** de un `CUSTOMER` obtenido por login, `GET /api/v1/probes/admin` (controlador de test de 001 con `@PreAuthorize("hasRole('ADMIN')")`) → 403 (Escenario 4, FR-021, SC-003). Con un token acuñado con `roles=["ADMIN"]` → 200: verifica la conversión `roles` → `ROLE_*` (FR-008).
+- [X] T056 [US4] [TEST] Añadir a `src/test/java/com/mangateca/api/identity/AuthFlowIT.java` el `@Nested Roles`. Con el access token **real** de un `CUSTOMER` obtenido por login, `GET /api/v1/probes/admin` (controlador de test de 001 con `@PreAuthorize("hasRole('ADMIN')")`) → 403 (Escenario 4, FR-021, SC-003). Con un token acuñado con `roles=["ADMIN"]` → 200: verifica la conversión `roles` → `ROLE_*` (FR-008).
 
 ### Implementation for User Story 4
 
-- [ ] T057 [US4] [CODE] Añadir `me(UUID userId)` con `@Transactional(readOnly = true)` a `src/main/java/com/mangateca/api/identity/application/AuthenticationService.java`: devuelve `Optional<User>`, vacío si el usuario no existe o está deshabilitado (FR-016).
-- [ ] T058 [US4] [CODE] Añadir `GET /me` a `src/main/java/com/mangateca/api/identity/web/AuthController.java`. Recibe `@AuthenticationPrincipal Jwt jwt` y toma `UUID.fromString(jwt.getSubject())`; si encuentra al usuario responde 200 con `UserMapper`. Si no, lanza `ErrorResponseException(UNAUTHORIZED)` con `getHeaders().set(WWW_AUTHENTICATE, "Bearer")`; el `GlobalExceptionHandler` produce el mismo cuerpo que el entry point de 401 de 001 (`about:blank`, «Se requiere autenticación válida.»). La identidad sale solo del token (FR-016, FR-020, Constitución V, research R10).
+- [X] T057 [US4] [CODE] Añadir `me(UUID userId)` con `@Transactional(readOnly = true)` a `src/main/java/com/mangateca/api/identity/application/AuthenticationService.java`: devuelve `Optional<User>`, vacío si el usuario no existe o está deshabilitado (FR-016).
+- [X] T058 [US4] [CODE] Añadir `GET /me` a `src/main/java/com/mangateca/api/identity/web/AuthController.java`. Recibe `@AuthenticationPrincipal Jwt jwt` y toma `UUID.fromString(jwt.getSubject())`; si encuentra al usuario responde 200 con `UserMapper`. Si no, lanza `ErrorResponseException(UNAUTHORIZED)` con `getHeaders().set(WWW_AUTHENTICATE, "Bearer")`; el `GlobalExceptionHandler` produce el mismo cuerpo que el entry point de 401 de 001 (`about:blank`, «Se requiere autenticación válida.»). La identidad sale solo del token (FR-016, FR-020, Constitución V, research R10).
 
 **Checkpoint**: `./mvnw verify` en verde con T053–T056. US1 a US3 siguen en verde.
 
