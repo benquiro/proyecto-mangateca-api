@@ -1,0 +1,441 @@
+# Contrato del modulo catalog (lectura publica). Se contrasta con GET /v3/api-docs (perfil dev)
+# al implementar. Divergencias aceptadas, por diseno (igual que en 002):
+#  - info/servers/tags: el documento generado es de toda la API; este contrato es solo de catalog.
+#  - ProblemDetail: el esquema generado es el de Spring (campo `properties` libre). En runtime
+#    las extensiones se aplanan en el nivel raiz (p. ej. `errors`), como describe este contrato.
+#  - Seguridad: el generado declara bearerAuth global y `security: []` en estas operaciones.
+#  - Esquemas de pagina: el generado los llama PageResponseProductSummaryResponse,
+#    PageResponseSeriesResponse y PageResponseNamedResponse (contrato: ProductSummaryPage,
+#    SeriesPage, NamedPage); misma forma `content` + `page`. En el generado el 200 de los seis
+#    listados paginados declara el media type `*/*` (springdoc infiere el esquema del tipo de
+#    retorno); declarar `application/json` en @ApiResponse hace perder el esquema, y fijar
+#    `produces` cambiaria el comportamiento HTTP, asi que se acepta.
+#  - Esquemas generados sin `required`, sin `minimum`/`example`/`description` de campos, con
+#    `format: int32` en enteros y sin `nullable` ni `oneOf` con null en `series`, `volumeNumber`
+#    e `isbn` (la ausencia/null se documenta aqui y en las descripciones).
+#  - Parametros: `page`/`size` generados con minimum/maximum pero sin `default` (0 y 20 se
+#    documentan en este contrato); `minPrice`/`maxPrice` como `exclusiveMinimum: 0`
+#    (equivale a `minimum: 1`); `sort` con `pattern` pero sin `default`.
+#  - Orden de los parametros de listProducts distinto (page, size, sort, q, ...): irrelevante.
+# Verificado contra /v3/api-docs el 2026-11-06 (T063): ocho rutas, parametros, 200/400/404,
+# forma `content` + `page`, `security: []` en las ocho operaciones y ProblemDetail
+# (`application/problem+json`) coinciden con el contrato salvo lo listado arriba.
+openapi: 3.1.0
+info:
+  title: Mangateca API - Catalog (Public Read)
+  version: 0.1.0
+  description: |
+    Catalogo de mangas, libros y comics, de solo lectura y acceso anonimo.
+
+    - Solo se ven productos PUBLISHED. Un producto no publicado y uno inexistente responden
+      el mismo 404.
+    - Precios en pesos chilenos (CLP), enteros, sin decimales.
+    - Todo listado es paginado: `page` desde 0 (maximo 1000000), `size` por defecto 20 y
+      maximo 100 (mayor => 400, no se ajusta en silencio).
+    - Los listados devuelven una pagina (`PageResponse`): `content` y `page` (`size`, `number`,
+      `totalElements`, `totalPages`). Una pagina fuera de rango devuelve `content` vacio.
+    - Los errores son `application/problem+json` (RFC 9457).
+    - Se ignora cualquier `Authorization` en estas rutas: el catalogo es identico para todos.
+    - Cada operacion GET acepta tambien HEAD sin credenciales (mismas cabeceras, sin cuerpo).
+      Cualquier otro metodo sobre estas rutas responde 401 sin token.
+    - `sort` sin sentido (`sort=price`) es ascendente.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Products
+  - name: Series
+  - name: Classifications
+paths:
+  /api/v1/products:
+    get:
+      tags: [Products]
+      operationId: listProducts
+      summary: Listar, buscar y filtrar productos publicados
+      description: |
+        `q` se normaliza (minusculas, sin tildes) y se divide en palabras: cada palabra debe
+        aparecer, de forma parcial, en el titulo o en el nombre de algun autor. Ademas, si
+        `q` completo (sin guiones ni espacios) es exactamente el ISBN de un producto, ese
+        producto tambien coincide. `q` vacio o solo con espacios equivale a no buscar.
+        Una palabra es una secuencia separada por espacios en blanco; la puntuacion interna se
+        conserva (`spider-man` es una sola palabra). `q` admite hasta 100 caracteres.
+        Orden por defecto: `createdAt,desc`. El orden es estable (desempate por id).
+        Los parametros son de un solo valor: si se repite uno (`genreId`, `type`, `size`, ...) se
+        usa el primero y se ignoran los demas; en `q` y `sort` los valores repetidos se unen con
+        coma (`sort` repetido resulta en 400). Los parametros desconocidos se ignoran.
+        Los autores de cada tarjeta se devuelven ordenados por nombre ascendente y, a igual nombre, por id.
+      security: []
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+          example: dragon toriyama
+        - name: type
+          in: query
+          schema: { $ref: '#/components/schemas/ProductType' }
+        - name: genreId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: authorId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: publisherId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: seriesId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: minPrice
+          in: query
+          description: CLP, inclusivo. Debe ser mayor que 0 y no superar `maxPrice`.
+          schema: { type: integer, format: int64, minimum: 1 }
+        - name: maxPrice
+          in: query
+          description: CLP, inclusivo. Debe ser mayor que 0.
+          schema: { type: integer, format: int64, minimum: 1 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - name: sort
+          in: query
+          description: |
+            Un solo criterio `clave[,asc|desc]`. Claves permitidas: `title`, `price`,
+            `publicationDate`, `createdAt`. Sentido por defecto: `asc`.
+          schema:
+            type: string
+            pattern: '^(title|price|publicationDate|createdAt)(,(asc|desc))?$'
+            default: createdAt,desc
+          example: price,desc
+      responses:
+        '200':
+          description: Pagina de tarjetas de producto.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSummaryPage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/products/{id}:
+    get:
+      tags: [Products]
+      operationId: getProduct
+      summary: Detalle de un producto publicado
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Detalle del producto.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetailResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/series:
+    get:
+      tags: [Series]
+      operationId: listSeries
+      summary: Listar series con al menos un volumen publicado (orden alfabetico)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Pagina de series.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeriesPage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/series/{id}:
+    get:
+      tags: [Series]
+      operationId: getSeries
+      summary: Datos de una serie (sin volumenes)
+      description: 404 si la serie no existe o no tiene volumenes publicados.
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Datos de la serie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeriesResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/series/{id}/volumes:
+    get:
+      tags: [Series]
+      operationId: listSeriesVolumes
+      summary: Volumenes publicados de una serie, por numero de volumen ascendente
+      description: |
+        Orden fijo por numero de volumen. Devuelve la misma tarjeta que el listado de
+        productos. 404 si la serie no existe o no tiene volumenes publicados.
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Pagina de tarjetas de producto.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSummaryPage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/genres:
+    get:
+      tags: [Classifications]
+      operationId: listGenres
+      summary: Generos con al menos un producto publicado (orden alfabetico)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Pagina de generos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamedPage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/authors:
+    get:
+      tags: [Classifications]
+      operationId: listAuthors
+      summary: Autores con al menos un producto publicado (orden alfabetico)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Pagina de autores.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamedPage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/publishers:
+    get:
+      tags: [Classifications]
+      operationId: listPublishers
+      summary: Editoriales con al menos un producto publicado (orden alfabetico)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Pagina de editoriales.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamedPage'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Indice de pagina desde 0.
+      schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    Size:
+      name: size
+      in: query
+      description: Tamano de pagina. Mayor que 100 => 400.
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+  responses:
+    ValidationError:
+      description: |
+        Parametro invalido (precio minimo mayor que el maximo, tipo inexistente, orden no
+        permitido, paginacion fuera de limites, identificador mal formado).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: about:blank
+            title: Bad Request
+            status: 400
+            detail: La petición contiene campos inválidos.
+            instance: /api/v1/products
+            errors:
+              - field: size
+                message: debe ser menor o igual que 100
+    NotFound:
+      description: |
+        El recurso no existe o no esta publicado. La respuesta es identica en ambos casos.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: about:blank
+            title: Not Found
+            status: 404
+            detail: Recurso no encontrado.
+            instance: /api/v1/products/0b6f6d0e-6d0f-4c79-9d6c-6f7ad6b0a001
+  schemas:
+    ProductType:
+      type: string
+      enum: [MANGA, LIBRO, COMIC]
+    NamedResponse:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    SeriesResponse:
+      type: object
+      required: [id, name, description]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, example: Dragon Ball }
+        description: { type: string }
+    ProductSummaryResponse:
+      type: object
+      description: Tarjeta de producto (listado y volumenes de serie).
+      required: [id, title, type, authors, price, coverUrl]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, example: Dragon Ball 3 }
+        type: { $ref: '#/components/schemas/ProductType' }
+        authors:
+          description: Ordenados por nombre ascendente y, a igual nombre, por id.
+          type: array
+          items: { $ref: '#/components/schemas/NamedResponse' }
+        price:
+          type: integer
+          format: int64
+          minimum: 1
+          description: CLP, sin decimales.
+          example: 8990
+        coverUrl: { type: string, format: uri }
+        series:
+          description: Ausente (null) si el producto no pertenece a una serie.
+          oneOf:
+            - $ref: '#/components/schemas/NamedResponse'
+            - type: 'null'
+        volumeNumber:
+          description: Presente si y solo si hay serie.
+          type: [integer, 'null']
+          minimum: 1
+    ProductDetailResponse:
+      type: object
+      required: [id, title, type, synopsis, authors, publisher, genres, language, pageCount, publicationDate, price, coverUrl]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        type: { $ref: '#/components/schemas/ProductType' }
+        synopsis: { type: string }
+        authors:
+          description: Ordenados por nombre ascendente y, a igual nombre, por id.
+          type: array
+          items: { $ref: '#/components/schemas/NamedResponse' }
+        publisher: { $ref: '#/components/schemas/NamedResponse' }
+        genres:
+          description: Ordenados por nombre ascendente y, a igual nombre, por id.
+          type: array
+          items: { $ref: '#/components/schemas/NamedResponse' }
+        isbn:
+          description: ISBN-10 o ISBN-13 normalizado (sin guiones). Null si no tiene.
+          type: [string, 'null']
+          example: '9784088820118'
+        language:
+          type: string
+          description: Texto libre de hasta 35 caracteres (codigo corto tipo BCP 47, p. ej. `es`, `ja`); informativo, no se valida el formato.
+          example: es
+        pageCount: { type: integer, minimum: 1 }
+        publicationDate:
+          type: string
+          format: date
+          description: Fecha de calendario ISO-8601 sin zona horaria. La fecha de incorporacion (`createdAt`) solo se usa para ordenar y no se expone.
+        price:
+          type: integer
+          format: int64
+          minimum: 1
+          description: CLP, sin decimales.
+        coverUrl: { type: string, format: uri }
+        series:
+          description: Permite llegar a `GET /api/v1/series/{id}`.
+          oneOf:
+            - $ref: '#/components/schemas/NamedResponse'
+            - type: 'null'
+        volumeNumber:
+          type: [integer, 'null']
+          minimum: 1
+    PageMetadata:
+      type: object
+      required: [size, number, totalElements, totalPages]
+      properties:
+        size: { type: integer }
+        number: { type: integer, description: Indice de pagina desde 0. }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+    ProductSummaryPage:
+      type: object
+      required: [content, page]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/ProductSummaryResponse' }
+        page: { $ref: '#/components/schemas/PageMetadata' }
+    NamedPage:
+      type: object
+      required: [content, page]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/NamedResponse' }
+        page: { $ref: '#/components/schemas/PageMetadata' }
+    SeriesPage:
+      type: object
+      required: [content, page]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/SeriesResponse' }
+        page: { $ref: '#/components/schemas/PageMetadata' }
+    ProblemDetail:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri, example: 'about:blank' }
+        title: { type: string }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail: { type: string }
+        instance: { type: string }
+        errors:
+          type: array
+          description: Solo en validacion. Nunca incluye el valor rechazado.
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field: { type: string }
+              message: { type: string }

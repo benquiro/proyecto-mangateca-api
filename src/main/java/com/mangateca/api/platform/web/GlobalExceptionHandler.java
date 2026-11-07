@@ -1,23 +1,25 @@
 package com.mangateca.api.platform.web;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-
-import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.context.MessageSourceResolvable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
+import org.springframework.validation.method.ParameterErrors;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -25,9 +27,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
-import org.springframework.validation.method.ParameterErrors;
-import org.springframework.validation.method.ParameterValidationResult;
 
 /**
  * Traduce los errores de MVC a Problem Details (RFC 9457) con un catalogo de textos generico.
@@ -41,6 +42,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	private static final String INVALID_FIELDS_DETAIL = "La petición contiene campos inválidos.";
 
 	private static final String INTERNAL_ERROR_DETAIL = "Se produjo un error interno.";
+
+	private static final String BINDING_FAILURE_MESSAGE = "Formato de valor inválido.";
 
 	private static final URI ABOUT_BLANK = URI.create("about:blank");
 
@@ -123,7 +126,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		List<FieldErrorItem> errors = new ArrayList<>();
 		for (ObjectError error : ex.getBindingResult().getAllErrors()) {
 			String field = error instanceof FieldError fieldError ? fieldError.getField() : error.getObjectName();
-			errors.add(new FieldErrorItem(field, messageOf(error)));
+			String message = error instanceof FieldError fieldError && fieldError.isBindingFailure()
+					? BINDING_FAILURE_MESSAGE : messageOf(error);
+			errors.add(new FieldErrorItem(field, message));
 		}
 		return validationResponse(ex, headers, status, request, errors);
 	}
@@ -150,6 +155,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			}
 		}
 		return validationResponse(ex, headers, status, request, errors);
+	}
+
+	@Override
+	protected @Nullable ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex, HttpHeaders headers,
+			HttpStatusCode status, WebRequest request) {
+		String field = ex instanceof MethodArgumentTypeMismatchException mismatch ? mismatch.getName()
+				: ex.getPropertyName() != null ? ex.getPropertyName() : "parameter";
+		return validationResponse(ex, headers, status, request,
+				List.of(new FieldErrorItem(field, BINDING_FAILURE_MESSAGE)));
 	}
 
 	private ResponseEntity<Object> validationResponse(Exception ex, HttpHeaders headers, HttpStatusCode status,
