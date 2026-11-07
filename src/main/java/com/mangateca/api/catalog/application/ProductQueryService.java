@@ -17,6 +17,7 @@ import com.mangateca.api.catalog.domain.ProductId;
 import com.mangateca.api.catalog.domain.ProductRepository;
 import com.mangateca.api.catalog.domain.ProductSearchCriteria;
 import com.mangateca.api.catalog.domain.ProductSpecifications;
+import com.mangateca.api.catalog.domain.PublicationStatus;
 
 /**
  * Consultas de lectura del catálogo. La paginación se resuelve en BD sobre IDs y después se cargan las entidades.
@@ -43,6 +44,11 @@ public class ProductQueryService {
 			.collect(Collectors.toMap(Product::getId, Function.identity()));
 		List<Product> ordered = ids.stream().map(byId::get).toList();
 		return new PageImpl<>(ordered, pageable, idsPage.getTotalElements());
+	}
+
+	public Product detail(UUID id) {
+		return productRepository.findWithDetailsByIdAndStatus(id, PublicationStatus.PUBLISHED)
+			.orElseThrow(CatalogNotFoundException::new);
 	}
 
 }

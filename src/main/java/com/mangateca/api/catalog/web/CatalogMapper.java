@@ -3,8 +3,11 @@ package com.mangateca.api.catalog.web;
 import org.mapstruct.Mapper;
 
 import com.mangateca.api.catalog.domain.Author;
+import com.mangateca.api.catalog.domain.Genre;
+import com.mangateca.api.catalog.domain.Isbn;
 import com.mangateca.api.catalog.domain.Money;
 import com.mangateca.api.catalog.domain.Product;
+import com.mangateca.api.catalog.domain.Publisher;
 import com.mangateca.api.catalog.domain.Series;
 
 /**
@@ -16,9 +19,19 @@ public interface CatalogMapper {
 
 	ProductSummaryResponse toSummary(Product product);
 
+	ProductDetailResponse toDetail(Product product);
+
 	NamedResponse toNamed(Author author);
 
+	NamedResponse toNamed(Publisher publisher);
+
+	NamedResponse toNamed(Genre genre);
+
 	NamedResponse toNamed(Series series);
+
+	default String toString(Isbn isbn) {
+		return isbn.value();
+	}
 
 	default long toLong(Money money) {
 		return money.amount().longValueExact();
