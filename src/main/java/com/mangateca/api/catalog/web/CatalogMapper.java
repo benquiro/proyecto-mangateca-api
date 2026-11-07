@@ -29,6 +29,8 @@ public interface CatalogMapper {
 
 	NamedResponse toNamed(Series series);
 
+	SeriesResponse toSeries(Series series);
+
 	default String toString(Isbn isbn) {
 		return isbn.value();
 	}
