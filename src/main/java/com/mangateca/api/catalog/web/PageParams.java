@@ -5,7 +5,6 @@ import jakarta.validation.constraints.Min;
 import org.jspecify.annotations.Nullable;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 
 /**
  * Parámetros de paginación. Un tamaño fuera de rango se rechaza con 400; nunca se recorta.
@@ -28,8 +27,8 @@ public record PageParams(
 		this.size = size == null ? DEFAULT_SIZE : size;
 	}
 
-	public PageRequest toPageRequest(Sort sort) {
-		return PageRequest.of(page, size, sort);
+	public PageRequest toPageRequest() {
+		return PageRequest.of(page, size);
 	}
 
 }

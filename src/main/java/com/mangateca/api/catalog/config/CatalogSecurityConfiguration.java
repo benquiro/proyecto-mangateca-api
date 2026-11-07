@@ -20,28 +20,28 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 @Configuration(proxyBeanMethods = false)
 public class CatalogSecurityConfiguration {
 
-    private static final String[] PUBLIC_CATALOG_PATHS = {
-        "/api/v1/products", "/api/v1/products/*", "/api/v1/series", "/api/v1/series/*",
-        "/api/v1/series/*/volumes", "/api/v1/genres", "/api/v1/authors", "/api/v1/publishers"
-    };
+	private static final String[] PUBLIC_CATALOG_PATHS = {
+		"/api/v1/products", "/api/v1/products/*", "/api/v1/series", "/api/v1/series/*",
+		"/api/v1/series/*/volumes", "/api/v1/genres", "/api/v1/authors", "/api/v1/publishers"
+	};
 
-    private static final HttpMethod[] PUBLIC_CATALOG_METHODS = {HttpMethod.GET, HttpMethod.HEAD, HttpMethod.OPTIONS};
+	private static final HttpMethod[] PUBLIC_CATALOG_METHODS = {HttpMethod.GET, HttpMethod.HEAD, HttpMethod.OPTIONS};
 
-    @Bean
-    @Order(2)
-    SecurityFilterChain catalogSecurityFilterChain(HttpSecurity http) {
-        List<RequestMatcher> matchers = new ArrayList<>();
-        for (String path : PUBLIC_CATALOG_PATHS) {
-            for (HttpMethod method : PUBLIC_CATALOG_METHODS) {
-                matchers.add(PathPatternRequestMatcher.withDefaults().matcher(method, path));
-            }
-        }
-        http.securityMatcher(new OrRequestMatcher(matchers))
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-            .csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .cors(Customizer.withDefaults());
-        return http.build();
-    }
+	@Bean
+	@Order(2)
+	SecurityFilterChain catalogSecurityFilterChain(HttpSecurity http) {
+		List<RequestMatcher> matchers = new ArrayList<>();
+		for (String path : PUBLIC_CATALOG_PATHS) {
+			for (HttpMethod method : PUBLIC_CATALOG_METHODS) {
+				matchers.add(PathPatternRequestMatcher.withDefaults().matcher(method, path));
+			}
+		}
+		http.securityMatcher(new OrRequestMatcher(matchers))
+			.authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+			.csrf(AbstractHttpConfigurer::disable)
+			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+			.cors(Customizer.withDefaults());
+		return http.build();
+	}
 
 }

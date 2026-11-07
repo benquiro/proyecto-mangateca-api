@@ -10,7 +10,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,7 +46,7 @@ public class SeriesController {
 							content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
 									schema = @Schema(implementation = ProblemDetail.class))) })
 	public PageResponse<SeriesResponse> list(@Valid @ModelAttribute PageParams params) {
-		return PageResponse.from(this.classificationService.listSeries(params.toPageRequest(Sort.unsorted()))
+		return PageResponse.from(this.classificationService.listSeries(params.toPageRequest())
 			.map(this.mapper::toSeries));
 	}
 
@@ -81,7 +80,7 @@ public class SeriesController {
 									schema = @Schema(implementation = ProblemDetail.class))) })
 	public PageResponse<ProductSummaryResponse> volumes(@PathVariable UUID id,
 			@Valid @ModelAttribute PageParams params) {
-		return PageResponse.from(this.productService.volumes(id, params.toPageRequest(Sort.unsorted()))
+		return PageResponse.from(this.productService.volumes(id, params.toPageRequest())
 			.map(this.mapper::toSummary));
 	}
 

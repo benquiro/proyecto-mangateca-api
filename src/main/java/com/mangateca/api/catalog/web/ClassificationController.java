@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,7 +39,7 @@ public class ClassificationController {
 							content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
 									schema = @Schema(implementation = ProblemDetail.class))) })
 	public PageResponse<NamedResponse> genres(@Valid @ModelAttribute PageParams params) {
-		return PageResponse.from(this.service.listGenres(params.toPageRequest(Sort.unsorted())).map(this.mapper::toNamed));
+		return PageResponse.from(this.service.listGenres(params.toPageRequest()).map(this.mapper::toNamed));
 	}
 
 	@GetMapping("/authors")
@@ -52,7 +51,7 @@ public class ClassificationController {
 							content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
 									schema = @Schema(implementation = ProblemDetail.class))) })
 	public PageResponse<NamedResponse> authors(@Valid @ModelAttribute PageParams params) {
-		return PageResponse.from(this.service.listAuthors(params.toPageRequest(Sort.unsorted())).map(this.mapper::toNamed));
+		return PageResponse.from(this.service.listAuthors(params.toPageRequest()).map(this.mapper::toNamed));
 	}
 
 	@GetMapping("/publishers")
@@ -64,7 +63,7 @@ public class ClassificationController {
 							content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
 									schema = @Schema(implementation = ProblemDetail.class))) })
 	public PageResponse<NamedResponse> publishers(@Valid @ModelAttribute PageParams params) {
-		return PageResponse.from(this.service.listPublishers(params.toPageRequest(Sort.unsorted())).map(this.mapper::toNamed));
+		return PageResponse.from(this.service.listPublishers(params.toPageRequest()).map(this.mapper::toNamed));
 	}
 
 }

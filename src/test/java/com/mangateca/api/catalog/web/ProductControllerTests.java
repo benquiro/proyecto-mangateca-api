@@ -119,6 +119,25 @@ class ProductControllerTests {
 		assertInvalidParameter(result, "minPrice", null);
 	}
 
+	@Test
+	@DisplayName("Edge Cases / research R9: size=10&size=500 usa solo el primer valor y responde 200 con tamano 10")
+	void shouldUseFirstValueWhenSizeIsRepeated() {
+		stub(List.of(), 0);
+
+		MvcTestResult result = this.mvc.get().uri(PRODUCTS + "?size=10&size=500").exchange();
+
+		assertThat(result).hasStatusOk();
+		assertThat(capturePageable().getPageSize()).isEqualTo(10);
+	}
+
+	@Test
+	@DisplayName("Edge Cases / research R9: sort=price&sort=title,desc se une con coma y responde 400 con errors[field=sort]")
+	void shouldReturn400WhenSortIsRepeated() {
+		MvcTestResult result = this.mvc.get().uri(PRODUCTS + "?sort=price&sort=title,desc").exchange();
+
+		assertInvalidParameter(result, "sort", null);
+	}
+
 	private void assertInvalidParameter(MvcTestResult result, String field, String forbiddenInBody) {
 		assertThat(result).hasStatus(400);
 		assertThat(result).hasContentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);

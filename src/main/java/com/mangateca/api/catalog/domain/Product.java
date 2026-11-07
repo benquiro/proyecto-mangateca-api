@@ -83,13 +83,13 @@ public class Product {
 	@ManyToMany
 	@JoinTable(name = "product_authors", joinColumns = @JoinColumn(name = "product_id"),
 			inverseJoinColumns = @JoinColumn(name = "author_id"))
-	@OrderBy("name")
+	@OrderBy("name, id")
 	private Set<Author> authors = new LinkedHashSet<>();
 
 	@ManyToMany
 	@JoinTable(name = "product_genres", joinColumns = @JoinColumn(name = "product_id"),
 			inverseJoinColumns = @JoinColumn(name = "genre_id"))
-	@OrderBy("name")
+	@OrderBy("name, id")
 	private Set<Genre> genres = new LinkedHashSet<>();
 
 }
