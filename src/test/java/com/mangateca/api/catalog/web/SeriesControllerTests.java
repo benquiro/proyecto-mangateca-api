@@ -75,6 +75,30 @@ class SeriesControllerTests {
 	}
 
 	@Test
+	@DisplayName("US5 Escenario 2 / FR-013: GET /series responde 200 PageResponse de series con metadatos")
+	void shouldReturnPageOfSeries() {
+		Series dragonBall = CatalogFixtures.series("Dragon Ball", "Historia de Goku");
+		Series naruto = CatalogFixtures.series("Naruto", "Historia de un ninja");
+		when(this.classificationService.listSeries(any(Pageable.class))).thenAnswer(invocation -> {
+			Pageable pageable = invocation.getArgument(0);
+			return new PageImpl<>(List.of(dragonBall, naruto), pageable, 2);
+		});
+
+		MvcTestResult result = this.mvc.get().uri(SERIES).exchange();
+
+		assertThat(result).hasStatusOk();
+		JsonNode body = json(result);
+		assertThat(body.path("content")).hasSize(2);
+		assertThat(body.path("content").path(0).path("id").asString()).isEqualTo(dragonBall.getId().toString());
+		assertThat(body.path("content").path(0).path("name").asString()).isEqualTo("Dragon Ball");
+		assertThat(body.path("content").path(1).path("name").asString()).isEqualTo("Naruto");
+		assertThat(body.path("page").path("size").asInt()).isEqualTo(20);
+		assertThat(body.path("page").path("number").asInt()).isZero();
+		assertThat(body.path("page").path("totalElements").asLong()).isEqualTo(2);
+		assertThat(body.path("page").path("totalPages").asInt()).isEqualTo(1);
+	}
+
+	@Test
 	@DisplayName("US4 Escenario 1 / FR-011: GET /series/{id}/volumes responde 200 PageResponse en el orden del servicio")
 	void shouldReturnVolumesPageInServiceOrder() {
 		Series series = CatalogFixtures.series("Dragon Ball", "Historia de Goku");
