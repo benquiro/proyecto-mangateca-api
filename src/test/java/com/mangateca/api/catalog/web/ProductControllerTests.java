@@ -46,6 +46,7 @@ import com.mangateca.api.platform.security.ProblemDetailsResponseWriter;
 import com.mangateca.api.platform.security.SecurityConfiguration;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @WebMvcTest(ProductController.class)
 @ActiveProfiles("test")
@@ -127,7 +128,7 @@ class ProductControllerTests {
 		assertThat(hasField).as("errors contiene field=" + field).isTrue();
 		if (forbiddenInBody != null) {
 			// `instance` es la URI de la petición (presente en todo ProblemDetail); el valor no debe aparecer en el resto.
-			tools.jackson.databind.node.ObjectNode body = (tools.jackson.databind.node.ObjectNode) json(result);
+			ObjectNode body = (ObjectNode) json(result);
 			body.remove("instance");
 			assertThat(body.toString()).doesNotContain(forbiddenInBody);
 		}
@@ -265,8 +266,8 @@ class ProductControllerTests {
 			assertThat(result).hasStatus(404);
 			assertThat(result).hasContentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
 		}
-		tools.jackson.databind.node.ObjectNode bodyA = (tools.jackson.databind.node.ObjectNode) json(a);
-		tools.jackson.databind.node.ObjectNode bodyB = (tools.jackson.databind.node.ObjectNode) json(b);
+		ObjectNode bodyA = (ObjectNode) json(a);
+		ObjectNode bodyB = (ObjectNode) json(b);
 		assertThat(bodyA.path("status").asInt()).isEqualTo(404);
 		bodyA.remove("instance");
 		bodyB.remove("instance");
