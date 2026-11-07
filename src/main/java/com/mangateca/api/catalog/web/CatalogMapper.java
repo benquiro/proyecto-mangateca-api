@@ -28,7 +28,7 @@ public interface CatalogMapper {
 
 	NamedResponse toNamed(Genre genre);
 
-	NamedResponse toNamed(Series series);
+	@Nullable NamedResponse toNamed(@Nullable Series series);
 
 	SeriesResponse toSeries(Series series);
 

@@ -435,3 +435,17 @@ Task: "T028 NamedResponse y ProductSummaryResponse en src/main/java/com/mangatec
   sin escenario Given-When-Then (términos de 1–2 caracteres, texto en blanco). El escape de
   `%`/`_`/`\` y el ISBN con dígito verificador inválido sí se cubren en `ProductSearchIT`
   (añadidos tras la revisión de la fase US2).
+- Tests sin escenario Given-When-Then que se conservan (T068), porque cada uno fija una regla
+  explícita de la spec y es barato (`@WebMvcTest`, servicio mockeado):
+  `SeriesControllerTests` — `size=101` en `/series/{id}/volumes` (FR-011: mismo máximo que
+  FR-001) e id no UUID en detalle y volúmenes (Edge Cases «identificador con formato
+  inválido», FR-008, FR-022); `ProductControllerTests` — `size` y `sort` repetidos (Edge Cases
+  «parámetro repetido», R9) y detalle sin ISBN (FR-009: el ISBN es opcional y se devuelve nulo).
+
+---
+
+## Phase 9: Convergence
+
+- [X] T066 [CODE] Marcar `@Nullable` (JSpecify) los componentes del record `ProductSearchRequest` que pueden llegar nulos (`q`, `type`, `genreId`, `authorId`, `publisherId`, `seriesId`, `minPrice`, `maxPrice`) y el retorno de `CatalogMapper.toNamed(Series)`/su parámetro, que devuelve `null` para un producto sin serie; `./mvnw verify` sin advertencias. — `src/main/java/com/mangateca/api/catalog/web/ProductSearchRequest.java`, `src/main/java/com/mangateca/api/catalog/web/CatalogMapper.java` — per Constitution IV (contradicts)
+- [X] T067 [TEST] Corregir las referencias de `@DisplayName` en `ProductQueryServiceIT`: página fuera de rango → FR-004 (no FR-002); ordenamiento explícito → FR-002 (no FR-004); sin N+1 y detalle en una sola sentencia → Constitución IV (no FR-004). Sin cambios de aserciones. — `src/test/java/com/mangateca/api/catalog/application/ProductQueryServiceIT.java` — per tasks: trazabilidad T024/T038 (partial)
+- [X] T068 [TEST] Revisar los tests sin escenario Given-When-Then (`SeriesControllerTests`: `size=101` en volúmenes e id no UUID en detalle y volúmenes; `ProductControllerTests`: `size` y `sort` repetidos, detalle sin ISBN): justificarlos en «Notes» de `tasks.md` como se hizo con los añadidos de `ProductSearchIT`, o eliminarlos. — `src/test/java/com/mangateca/api/catalog/web/SeriesControllerTests.java`, `src/test/java/com/mangateca/api/catalog/web/ProductControllerTests.java` — per Constitution VI (unrequested)

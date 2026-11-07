@@ -29,10 +29,10 @@ public record ProductSearchRequest(
 		@Max(value = PageParams.MAX_SIZE, message = "size debe ser menor o igual que 100") Integer size,
 		@Pattern(regexp = "^(title|price|publicationDate|createdAt)(,(asc|desc))?$",
 				message = "sort debe ser title, price, publicationDate o createdAt, opcionalmente seguido de ,asc o ,desc") String sort,
-		@Size(max = 100, message = "q debe tener como máximo 100 caracteres") String q, ProductType type,
-		UUID genreId, UUID authorId, UUID publisherId, UUID seriesId,
-		@Positive(message = "minPrice debe ser mayor que 0") Long minPrice,
-		@Positive(message = "maxPrice debe ser mayor que 0") Long maxPrice) {
+		@Size(max = 100, message = "q debe tener como máximo 100 caracteres") @Nullable String q,
+		@Nullable ProductType type, @Nullable UUID genreId, @Nullable UUID authorId, @Nullable UUID publisherId,
+		@Nullable UUID seriesId, @Positive(message = "minPrice debe ser mayor que 0") @Nullable Long minPrice,
+		@Positive(message = "maxPrice debe ser mayor que 0") @Nullable Long maxPrice) {
 
 	private static final String DEFAULT_SORT = "createdAt,desc";
 

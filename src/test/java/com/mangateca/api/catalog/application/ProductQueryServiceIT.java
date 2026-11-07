@@ -100,7 +100,7 @@ class ProductQueryServiceIT {
 	}
 
 	@Test
-	@DisplayName("US1 Escenario 1 / FR-004: el número de sentencias SQL no crece con el tamaño de página (sin N+1)")
+	@DisplayName("US1 Escenario 1 / Constitución IV: el número de sentencias SQL no crece con el tamaño de página (sin N+1)")
 	void shouldIssueSameNumberOfStatementsRegardlessOfPageSize() {
 		UUID series = this.data.series("Serie Test", "Descripción");
 		UUID authorA = this.data.author("Autor A");
@@ -141,7 +141,7 @@ class ProductQueryServiceIT {
 	}
 
 	@Test
-	@DisplayName("US1 Escenario 3 / FR-002: una página fuera de rango devuelve contenido vacío y el total real")
+	@DisplayName("US1 Escenario 3 / FR-004: una página fuera de rango devuelve contenido vacío y el total real")
 	void shouldReturnEmptyContentWhenPageIsBeyondLastPage() {
 		for (int i = 0; i < 45; i++) {
 			this.data.product("Producto " + i, this.publisher).createdAt(BASE.plusSeconds(i)).insert();
@@ -161,7 +161,7 @@ class ProductQueryServiceIT {
 
 	@ParameterizedTest(name = "{0} {1}")
 	@MethodSource("sortCases")
-	@DisplayName("US1 Escenario 4 / FR-004: el orden pedido se respeta y los empates se resuelven por id")
+	@DisplayName("US1 Escenario 4 / FR-002: el orden pedido se respeta y los empates se resuelven por id")
 	void shouldSortByRequestedPropertyWithIdAsTieBreaker(String property, Sort.Direction direction) {
 		// Seis productos en tres grupos de dos con el mismo valor en cualquier propiedad ordenable.
 		List<UUID> ids = new ArrayList<>();
@@ -205,7 +205,7 @@ class ProductQueryServiceIT {
 	}
 
 	@Test
-	@DisplayName("US3 Escenario 1 / FR-009, FR-004: detalle completo en una sola sentencia SQL y sin cargas perezosas")
+	@DisplayName("US3 Escenario 1 / FR-009, Constitución IV: detalle completo en una sola sentencia SQL y sin cargas perezosas")
 	void shouldReturnFullDetailWithSingleStatement() {
 		UUID series = this.data.series("Serie Test", "Descripción");
 		UUID authorA = this.data.author("Autor A");
