@@ -1,6 +1,7 @@
 package com.mangateca.api.catalog.domain;
 
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * ISBN-10 o ISBN-13 normalizado (sin guiones ni espacios, en mayúsculas) con dígito verificador válido.
@@ -24,6 +25,22 @@ public record Isbn(String value) {
 		if (!valid) {
 			throw new IllegalArgumentException("ISBN inválido");
 		}
+	}
+
+	/**
+	 * Consulta sin excepciones: normaliza y devuelve el ISBN solo si es válido.
+	 */
+	public static Optional<Isbn> parse(String raw) {
+		String normalized = normalize(raw);
+		return hasValidCheckDigit(normalized) ? Optional.of(new Isbn(normalized)) : Optional.empty();
+	}
+
+	private static boolean hasValidCheckDigit(String normalized) {
+		return switch (normalized.length()) {
+			case ISBN10_LENGTH -> isValidIsbn10(normalized);
+			case ISBN13_LENGTH -> isValidIsbn13(normalized);
+			default -> false;
+		};
 	}
 
 	/**

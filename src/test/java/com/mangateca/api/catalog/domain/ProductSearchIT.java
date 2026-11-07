@@ -149,6 +149,19 @@ class ProductSearchIT {
 		assertThat(page.getTotalElements()).isEqualTo(1);
 	}
 
+	@ParameterizedTest
+	@ValueSource(strings = { "978-4-08-882011-9", "9784088820119", "0-306-40615-3", "0306406153" })
+	@DisplayName("US2 / FR-005 / research R1: texto con forma de ISBN y dígito verificador inválido no coincide y no falla")
+	void shouldReturnEmptyPageForIsbnShapedTextWithInvalidCheckDigit(String term) {
+		this.data.product("Dragón Ball", this.publisher).isbn(ISBN).insert();
+		this.data.product("Naruto", this.publisher).isbn(OTHER_ISBN).insert();
+
+		Page<Product> page = search(text(term));
+
+		assertThat(page.getContent()).isEmpty();
+		assertThat(page.getTotalElements()).isZero();
+	}
+
 	@Test
 	@DisplayName("US2 Escenario 3 / FR-020: un ISBN de un producto no publicado no lo hace visible")
 	void shouldNotFindUnpublishedProductByIsbn() {

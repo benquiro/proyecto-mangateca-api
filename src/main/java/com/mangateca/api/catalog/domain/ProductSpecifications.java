@@ -7,6 +7,7 @@ import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -106,8 +107,8 @@ public final class ProductSpecifications {
 				perWord.add(wordMatches(root, query.subquery(Integer.class), cb, word));
 			}
 			Predicate allWords = cb.and(perWord.toArray(new Predicate[0]));
-			Isbn isbn = isbnOf(trimmed);
-			return isbn == null ? allWords : cb.or(allWords, cb.equal(root.get("isbn"), isbn));
+			return isbnOf(trimmed).<Predicate>map(isbn -> cb.or(allWords, cb.equal(root.get("isbn"), isbn)))
+				.orElse(allWords);
 		};
 	}
 
@@ -161,17 +162,12 @@ public final class ProductSpecifications {
 	 * ISBN buscado si el texto, sin guiones ni espacios y en mayúsculas, tiene forma de ISBN. Un ISBN con dígito
 	 * verificador inválido no puede existir en la base, así que simplemente no aporta coincidencia.
 	 */
-	private static @Nullable Isbn isbnOf(String text) {
+	private static Optional<Isbn> isbnOf(String text) {
 		String normalized = Isbn.normalize(text);
 		if (!ISBN_SHAPE.matcher(normalized).matches()) {
-			return null;
+			return Optional.empty();
 		}
-		try {
-			return new Isbn(normalized);
-		}
-		catch (IllegalArgumentException ex) {
-			return null;
-		}
+		return Isbn.parse(normalized);
 	}
 
 }
