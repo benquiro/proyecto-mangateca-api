@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.mangateca.api.catalog.application.ProductQueryService;
-import com.mangateca.api.catalog.domain.ProductSearchCriteria;
 
 /** Lectura pública del catálogo de productos. */
 @RestController
@@ -42,7 +41,7 @@ public class ProductController {
 									schema = @Schema(implementation = ProblemDetail.class))) })
 	public PageResponse<ProductSummaryResponse> list(@Valid @ModelAttribute ProductSearchRequest request) {
 		return PageResponse
-			.from(this.service.search(ProductSearchCriteria.NONE, request.toPageable()).map(this.mapper::toSummary));
+			.from(this.service.search(request.toCriteria(), request.toPageable()).map(this.mapper::toSummary));
 	}
 
 }

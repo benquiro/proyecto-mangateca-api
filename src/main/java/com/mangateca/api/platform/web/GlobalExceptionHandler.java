@@ -42,6 +42,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
 	private static final String INTERNAL_ERROR_DETAIL = "Se produjo un error interno.";
 
+	private static final String BINDING_FAILURE_MESSAGE = "Formato de valor inválido.";
+
 	private static final URI ABOUT_BLANK = URI.create("about:blank");
 
 	private static final String ERRORS_PROPERTY = "errors";
@@ -123,7 +125,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		List<FieldErrorItem> errors = new ArrayList<>();
 		for (ObjectError error : ex.getBindingResult().getAllErrors()) {
 			String field = error instanceof FieldError fieldError ? fieldError.getField() : error.getObjectName();
-			errors.add(new FieldErrorItem(field, messageOf(error)));
+			String message = error instanceof FieldError fieldError && fieldError.isBindingFailure()
+					? BINDING_FAILURE_MESSAGE : messageOf(error);
+			errors.add(new FieldErrorItem(field, message));
 		}
 		return validationResponse(ex, headers, status, request, errors);
 	}

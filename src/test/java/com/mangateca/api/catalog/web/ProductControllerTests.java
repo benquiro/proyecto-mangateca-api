@@ -4,12 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -84,6 +87,41 @@ class ProductControllerTests {
 			hasSize |= "size".equals(error.path("field").asString());
 		}
 		assertThat(hasSize).as("errors contiene field=size").isTrue();
+	}
+
+	@ParameterizedTest(name = "{0}={1} -> 400 con errors[field={0}]")
+	@CsvSource({ "type,XYZ,true", "genreId,abc,true", "sort,synopsis,false", "size,0,false", "page,-1,false" })
+	@DisplayName("US2 Escenario 6 / FR-008 / FR-022: parametro invalido responde 400 problem+json con errors[field]")
+	void shouldReturn400ProblemJsonWhenParameterIsInvalid(String param, String value, boolean mustNotEchoValue) {
+		MvcTestResult result = this.mvc.get().uri(PRODUCTS).param(param, value).exchange();
+
+		assertInvalidParameter(result, param, mustNotEchoValue ? value : null);
+	}
+
+	@Test
+	@DisplayName("US2 Escenario 6 / FR-008: minPrice=9000 y maxPrice=100 responde 400 con errors[field=minPrice]")
+	void shouldReturn400WhenMinPriceIsGreaterThanMaxPrice() {
+		MvcTestResult result = this.mvc.get()
+			.uri(PRODUCTS)
+			.param("minPrice", "9000")
+			.param("maxPrice", "100")
+			.exchange();
+
+		assertInvalidParameter(result, "minPrice", null);
+	}
+
+	private void assertInvalidParameter(MvcTestResult result, String field, String forbiddenInBody) {
+		assertThat(result).hasStatus(400);
+		assertThat(result).hasContentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
+		boolean hasField = false;
+		for (JsonNode error : json(result).path("errors")) {
+			hasField |= field.equals(error.path("field").asString());
+		}
+		assertThat(hasField).as("errors contiene field=" + field).isTrue();
+		if (forbiddenInBody != null) {
+			assertThat(json(result).toString()).doesNotContain(forbiddenInBody);
+		}
+		verifyNoInteractions(this.service);
 	}
 
 	@Test
