@@ -19,12 +19,14 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
 import org.springframework.web.ErrorResponse;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.validation.method.ParameterErrors;
 import org.springframework.validation.method.ParameterValidationResult;
@@ -154,6 +156,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			}
 		}
 		return validationResponse(ex, headers, status, request, errors);
+	}
+
+	@Override
+	protected @Nullable ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex, HttpHeaders headers,
+			HttpStatusCode status, WebRequest request) {
+		String field = ex instanceof MethodArgumentTypeMismatchException mismatch ? mismatch.getName()
+				: ex.getPropertyName() != null ? ex.getPropertyName() : "parameter";
+		return validationResponse(ex, headers, status, request,
+				List.of(new FieldErrorItem(field, BINDING_FAILURE_MESSAGE)));
 	}
 
 	private ResponseEntity<Object> validationResponse(Exception ex, HttpHeaders headers, HttpStatusCode status,
