@@ -1,6 +1,7 @@
 package com.mangateca.api.catalog.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -201,6 +202,60 @@ class ProductQueryServiceIT {
 			case "createdAt" -> Comparator.comparing(Product::getCreatedAt);
 			default -> throw new IllegalArgumentException(property);
 		};
+	}
+
+	@Test
+	@DisplayName("US3 Escenario 1 / FR-009, FR-004: detalle completo en una sola sentencia SQL y sin cargas perezosas")
+	void shouldReturnFullDetailWithSingleStatement() {
+		UUID series = this.data.series("Serie Test", "Descripción");
+		UUID authorA = this.data.author("Autor A");
+		UUID authorB = this.data.author("Autor B");
+		UUID genreA = this.data.genre("Accion");
+		UUID genreB = this.data.genre("Aventura");
+		UUID id = this.data.product("Detalle", this.publisher)
+			.series(series, 4)
+			.authors(authorA, authorB)
+			.genres(genreA, genreB)
+			.insert();
+		this.entityManager.flush();
+		this.entityManager.clear();
+		Statistics statistics = this.entityManager.unwrap(Session.class).getSessionFactory().getStatistics();
+		statistics.clear();
+
+		Product product = this.service.detail(id);
+		long statements = statistics.getPrepareStatementCount();
+		this.entityManager.clear();
+
+		assertThat(statements).isEqualTo(1);
+		assertThat(product.getId()).isEqualTo(id);
+		assertThat(product.getTitle()).isEqualTo("Detalle");
+		assertThat(product.getAuthors()).extracting(a -> a.getName()).containsExactlyInAnyOrder("Autor A", "Autor B");
+		assertThat(product.getGenres()).extracting(g -> g.getName()).containsExactlyInAnyOrder("Accion", "Aventura");
+		assertThat(product.getPublisher().getName()).isEqualTo("Editorial Test");
+		assertThat(product.getSeries().getName()).isEqualTo("Serie Test");
+		assertThat(product.getVolumeNumber()).isEqualTo(4);
+	}
+
+	@Test
+	@DisplayName("US3 Escenario 2 / FR-010: no publicado e inexistente lanzan la misma CatalogNotFoundException")
+	void shouldThrowIndistinguishableNotFoundForUnpublishedAndMissingProduct() {
+		UUID unpublished = this.data.product("Borrador", this.publisher).status(PublicationStatus.UNPUBLISHED).insert();
+		this.entityManager.clear();
+
+		Throwable forUnpublished = catchThrowable(() -> this.service.detail(unpublished));
+		Throwable forMissing = catchThrowable(() -> this.service.detail(UUID.randomUUID()));
+
+		assertThat(forUnpublished).isInstanceOf(CatalogNotFoundException.class);
+		assertThat(forMissing).isInstanceOf(CatalogNotFoundException.class);
+		CatalogNotFoundException a = (CatalogNotFoundException) forUnpublished;
+		CatalogNotFoundException b = (CatalogNotFoundException) forMissing;
+		assertThat(a.getStatusCode()).isEqualTo(b.getStatusCode());
+		assertThat(a.getStatusCode().value()).isEqualTo(404);
+		assertThat(a.getMessage()).isEqualTo(b.getMessage());
+		assertThat(a.getBody().getType()).isEqualTo(b.getBody().getType());
+		assertThat(a.getBody().getTitle()).isEqualTo(b.getBody().getTitle());
+		assertThat(a.getBody().getDetail()).isEqualTo(b.getBody().getDetail());
+		assertThat(a.getBody().getDetail()).doesNotContain(unpublished.toString());
 	}
 
 }

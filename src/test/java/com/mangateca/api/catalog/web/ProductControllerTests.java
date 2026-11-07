@@ -7,7 +7,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,8 +29,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
+import com.mangateca.api.catalog.application.CatalogNotFoundException;
 import com.mangateca.api.catalog.application.ProductQueryService;
 import com.mangateca.api.catalog.config.CatalogSecurityConfiguration;
+import com.mangateca.api.catalog.domain.Author;
+import com.mangateca.api.catalog.domain.Genre;
+import com.mangateca.api.catalog.domain.Isbn;
 import com.mangateca.api.catalog.domain.Product;
 import com.mangateca.api.catalog.domain.ProductSearchCriteria;
 import com.mangateca.api.catalog.support.CatalogFixtures;
@@ -119,7 +126,10 @@ class ProductControllerTests {
 		}
 		assertThat(hasField).as("errors contiene field=" + field).isTrue();
 		if (forbiddenInBody != null) {
-			assertThat(json(result).toString()).doesNotContain(forbiddenInBody);
+			// `instance` es la URI de la petición (presente en todo ProblemDetail); el valor no debe aparecer en el resto.
+			tools.jackson.databind.node.ObjectNode body = (tools.jackson.databind.node.ObjectNode) json(result);
+			body.remove("instance");
+			assertThat(body.toString()).doesNotContain(forbiddenInBody);
 		}
 		verifyNoInteractions(this.service);
 	}
@@ -197,6 +207,79 @@ class ProductControllerTests {
 		assertThat(card.path("title").asString()).isEqualTo("Suelto");
 		assertThat(card.path("series").isNull() || card.path("series").isMissingNode()).isTrue();
 		assertThat(card.path("volumeNumber").isNull() || card.path("volumeNumber").isMissingNode()).isTrue();
+	}
+
+	@Test
+	@DisplayName("US3 Escenario 1 / FR-009, FR-012: el detalle de un volumen trae todos los campos y ninguno interno")
+	void shouldReturnProductDetailWithoutInternalFields() {
+		Product product = CatalogFixtures.product("Dragon Ball 3", new Isbn(CatalogFixtures.VALID_ISBN13),
+				CatalogFixtures.series("Dragon Ball", "Descripcion"), 3,
+				List.<Author>of(CatalogFixtures.author("Akira Toriyama"), CatalogFixtures.author("Otro")),
+				List.<Genre>of(CatalogFixtures.genre("Accion"), CatalogFixtures.genre("Aventura")));
+		when(this.service.detail(product.getId())).thenReturn(product);
+
+		MvcTestResult result = this.mvc.get().uri(PRODUCTS + "/" + product.getId()).exchange();
+
+		assertThat(result).hasStatusOk();
+		JsonNode body = json(result);
+		assertThat(body.path("id").asString()).isEqualTo(product.getId().toString());
+		assertThat(body.path("title").asString()).isEqualTo("Dragon Ball 3");
+		assertThat(body.path("type").asString()).isEqualTo("MANGA");
+		assertThat(body.path("synopsis").asString()).isEqualTo("Sinopsis de prueba");
+		assertThat(body.path("authors")).hasSize(2);
+		assertThat(body.path("authors").path(0).path("name").asString()).isNotBlank();
+		assertThat(body.path("publisher").path("name").asString()).isEqualTo("Editorial Test");
+		assertThat(body.path("publisher").path("id").asString()).isNotBlank();
+		assertThat(body.path("genres")).hasSize(2);
+		assertThat(body.path("isbn").asString()).isEqualTo(CatalogFixtures.VALID_ISBN13);
+		assertThat(body.path("language").asString()).isEqualTo("es");
+		assertThat(body.path("pageCount").asInt()).isEqualTo(192);
+		assertThat(body.path("publicationDate").asString()).isEqualTo("2024-01-15");
+		assertThat(body.path("price").isIntegralNumber()).isTrue();
+		assertThat(body.path("price").asLong()).isEqualTo(9990);
+		assertThat(body.path("coverUrl").asString()).isEqualTo("https://covers.example/cover.jpg");
+		assertThat(body.path("series").path("id").asString()).isEqualTo(product.getSeries().getId().toString());
+		assertThat(body.path("series").path("name").asString()).isEqualTo("Dragon Ball");
+		assertThat(body.path("volumeNumber").asInt()).isEqualTo(3);
+		Set<String> fields = new HashSet<>();
+		body.propertyNames().forEach(fields::add);
+		assertThat(fields).containsExactlyInAnyOrder("id", "title", "type", "synopsis", "authors", "publisher",
+				"genres", "isbn", "language", "pageCount", "publicationDate", "price", "coverUrl", "series",
+				"volumeNumber");
+		assertThat(fields).doesNotContain("status", "createdAt", "updatedAt");
+	}
+
+	@Test
+	@DisplayName("US3 Escenario 2 / FR-010, FR-022: dos UUID inexistentes dan 404 problem+json idéntico salvo instance")
+	void shouldReturnIdenticalProblemJson404ForDifferentMissingProducts() {
+		UUID first = UUID.randomUUID();
+		UUID second = UUID.randomUUID();
+		when(this.service.detail(any(UUID.class))).thenThrow(new CatalogNotFoundException());
+
+		MvcTestResult a = this.mvc.get().uri(PRODUCTS + "/" + first).exchange();
+		MvcTestResult b = this.mvc.get().uri(PRODUCTS + "/" + second).exchange();
+
+		verify(this.service).detail(first);
+		verify(this.service).detail(second);
+		for (MvcTestResult result : List.of(a, b)) {
+			assertThat(result).hasStatus(404);
+			assertThat(result).hasContentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
+		}
+		tools.jackson.databind.node.ObjectNode bodyA = (tools.jackson.databind.node.ObjectNode) json(a);
+		tools.jackson.databind.node.ObjectNode bodyB = (tools.jackson.databind.node.ObjectNode) json(b);
+		assertThat(bodyA.path("status").asInt()).isEqualTo(404);
+		bodyA.remove("instance");
+		bodyB.remove("instance");
+		assertThat(bodyA).isEqualTo(bodyB);
+		assertThat(bodyA.toString()).doesNotContain(first.toString()).doesNotContain(second.toString());
+	}
+
+	@Test
+	@DisplayName("US3 Escenario 3 / FR-008, FR-022: un id que no es UUID responde 400 con errors[field=id] sin el valor")
+	void shouldReturn400WithoutEchoWhenIdIsNotUuid() {
+		MvcTestResult result = this.mvc.get().uri(PRODUCTS + "/no-es-un-uuid").exchange();
+
+		assertInvalidParameter(result, "id", "no-es-un-uuid");
 	}
 
 	private void stub(List<Product> products, long total) {
