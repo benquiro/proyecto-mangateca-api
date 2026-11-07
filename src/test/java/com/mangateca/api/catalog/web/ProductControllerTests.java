@@ -301,6 +301,21 @@ class ProductControllerTests {
 		assertThat(body.path("volumeNumber").asInt()).isEqualTo(3);
 	}
 
+	@Test
+	@DisplayName("US3 Escenario 1 / FR-009: el detalle de un producto sin ISBN responde 200 con isbn nulo")
+	void shouldReturn200WithNullIsbnWhenProductHasNoIsbn() {
+		Product product = CatalogFixtures.productWithoutIsbn("Sin ISBN");
+		when(this.service.detail(product.getId())).thenReturn(product);
+
+		MvcTestResult result = this.mvc.get().uri(PRODUCTS + "/" + product.getId()).exchange();
+
+		assertThat(result).hasStatusOk();
+		JsonNode body = json(result);
+		assertThat(body.path("title").asString()).isEqualTo("Sin ISBN");
+		assertThat(body.has("isbn")).as("isbn presente en el JSON").isTrue();
+		assertThat(body.get("isbn").isNull()).as("isbn es null explícito").isTrue();
+	}
+
 	private void stub(List<Product> products, long total) {
 		when(this.service.search(any(ProductSearchCriteria.class), any(Pageable.class)))
 			.thenAnswer(invocation -> {

@@ -1,5 +1,6 @@
 package com.mangateca.api.catalog.web;
 
+import org.jspecify.annotations.Nullable;
 import org.mapstruct.Mapper;
 
 import com.mangateca.api.catalog.domain.Author;
@@ -31,8 +32,8 @@ public interface CatalogMapper {
 
 	SeriesResponse toSeries(Series series);
 
-	default String toString(Isbn isbn) {
-		return isbn.value();
+	default @Nullable String toString(@Nullable Isbn isbn) {
+		return isbn == null ? null : isbn.value();
 	}
 
 	default long toLong(Money money) {
