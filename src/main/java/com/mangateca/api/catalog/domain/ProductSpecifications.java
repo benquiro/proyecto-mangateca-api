@@ -1,5 +1,6 @@
 package com.mangateca.api.catalog.domain;
 
+import jakarta.persistence.criteria.AbstractQuery;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.hibernate.query.criteria.HibernateCriteriaBuilder;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -104,7 +106,7 @@ public final class ProductSpecifications {
 		return (root, query, cb) -> {
 			List<Predicate> perWord = new ArrayList<>();
 			for (String word : words) {
-				perWord.add(wordMatches(root, query.subquery(Integer.class), cb, word));
+				perWord.add(wordMatches(root, query, cb, word));
 			}
 			Predicate allWords = cb.and(perWord.toArray(new Predicate[0]));
 			return isbnOf(trimmed).<Predicate>map(isbn -> cb.or(allWords, cb.equal(root.get("isbn"), isbn)))
@@ -138,16 +140,25 @@ public final class ProductSpecifications {
 		return (root, query, cb) -> cb.lessThanOrEqualTo(root.<Money>get("price"), max);
 	}
 
-	private static Predicate wordMatches(Root<Product> root, Subquery<Integer> authorSub, CriteriaBuilder cb,
-			String word) {
+	/**
+	 * {@code id IN (títulos coincidentes UNION productos de autores coincidentes)}: cada rama usa su propio índice de
+	 * trigramas; un {@code OR} con {@code EXISTS} correlacionado obligaría a recorrer toda la tabla.
+	 */
+	private static Predicate wordMatches(Root<Product> root, AbstractQuery<?> query, CriteriaBuilder cb, String word) {
 		Expression<String> pattern = normalized(cb, cb.literal("%" + escapeLike(word) + "%"));
-		Predicate inTitle = cb.like(normalized(cb, root.<String>get("title")), pattern, LIKE_ESCAPE);
 
-		Root<Product> correlated = authorSub.correlate(root);
-		var author = correlated.join("authors");
-		Predicate inAuthor = cb.like(normalized(cb, author.<String>get("name")), pattern, LIKE_ESCAPE);
-		authorSub.select(cb.literal(1)).where(inAuthor);
-		return cb.or(inTitle, cb.exists(authorSub));
+		Subquery<UUID> byTitle = query.subquery(UUID.class);
+		Root<Product> titled = byTitle.from(Product.class);
+		byTitle.select(titled.<UUID>get("id"))
+			.where(cb.like(normalized(cb, titled.<String>get("title")), pattern, LIKE_ESCAPE));
+
+		Subquery<UUID> byAuthor = query.subquery(UUID.class);
+		Root<Product> authored = byAuthor.from(Product.class);
+		var author = authored.join("authors");
+		byAuthor.select(authored.<UUID>get("id"))
+			.where(cb.like(normalized(cb, author.<String>get("name")), pattern, LIKE_ESCAPE));
+
+		return root.<UUID>get("id").in(((HibernateCriteriaBuilder) cb).union(byTitle, byAuthor));
 	}
 
 	private static Expression<String> normalized(CriteriaBuilder cb, Expression<String> argument) {
