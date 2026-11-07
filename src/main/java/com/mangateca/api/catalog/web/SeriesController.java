@@ -38,6 +38,19 @@ public class SeriesController {
 		this.mapper = mapper;
 	}
 
+	@GetMapping
+	@SecurityRequirements
+	@Operation(operationId = "listSeries", summary = "Series con al menos un volumen publicado, en orden alfabético",
+			responses = {
+					@ApiResponse(responseCode = "200", description = "Página de series"),
+					@ApiResponse(responseCode = "400", description = "Parámetros inválidos",
+							content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+									schema = @Schema(implementation = ProblemDetail.class))) })
+	public PageResponse<SeriesResponse> list(@Valid @ModelAttribute PageParams params) {
+		return PageResponse.from(this.classificationService.listSeries(params.toPageRequest(Sort.unsorted()))
+			.map(this.mapper::toSeries));
+	}
+
 	@GetMapping("/{id}")
 	@SecurityRequirements
 	@Operation(operationId = "getSeries", summary = "Detalle de una serie con volúmenes publicados",
