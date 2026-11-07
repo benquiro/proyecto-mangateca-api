@@ -14,9 +14,17 @@ documentación consultada no cierra se marca **«verificar en implementación»*
   índices GIN de trigramas (`gin_trgm_ops`) sobre `catalog_normalize(products.title)` y
   `catalog_normalize(authors.name)`.
   - El texto se recorta, se divide por espacios en blanco y se descartan las palabras vacías.
-    Texto vacío o solo espacios = sin búsqueda.
+    Texto vacío o solo espacios = sin búsqueda. Una «palabra» es, por tanto, una secuencia
+    separada por espacios en blanco; la puntuación interna se conserva literal (`spider-man`
+    es una sola palabra, con coincidencia parcial sobre el título normalizado).
+  - Longitud: `q` ≤ 100 caracteres (`@Size`); más es 400 (FR-008). Eso acota el número de
+    palabras (como máximo 50). Coste máximo de una búsqueda anónima: `q` ≤ 100, `size` ≤ 100 y
+    el peor caso medido en quickstart §6.7 (término corto); el rate limiting se difiere a una
+    feature transversal.
   - Un producto coincide si **todas** las palabras coinciden, cada una en el título o en el
-    nombre de algún autor (`EXISTS` sobre `product_authors` + `authors`).
+    nombre de algún autor: `id IN (títulos UNION productos de autores)`, con
+    `HibernateCriteriaBuilder.union` (el `OR` con `EXISTS` correlacionado no usaba el índice de
+    trigramas del título; T064).
   - **O** si el texto completo, sin guiones ni espacios y en mayúsculas, es exactamente el ISBN
     del producto (`products.isbn = :texto`). Solo se evalúa si tiene forma de ISBN (9 dígitos +
     dígito o `X`, o 13 dígitos); no se valida el dígito verificador al buscar: un ISBN mal
@@ -80,11 +88,11 @@ documentación consultada no cierra se marca **«verificar en implementación»*
 
 - **Decision**:
   1. **Filtros como `EXISTS`**: `ProductSpecifications` expone un predicado por filtro. Los de
-     autor, género y búsqueda por autor son subconsultas `EXISTS`; tipo, editorial, serie,
+     autor y género son subconsultas `EXISTS`; la búsqueda de texto es `id IN (… UNION …)` (R1); tipo, editorial, serie,
      precio y estado son comparaciones directas sobre `products`. No hay `join` en la consulta
      principal, así que un producto con varios autores o géneros no se duplica y no hace falta
      `DISTINCT` (FR-007). `Specification.unrestricted()` es el predicado neutro para filtros
-     ausentes. Solo se usan las APIs nativas de Spring Data JPA 4.
+     ausentes. Se usan las `Specification` de Spring Data JPA 4 y, solo para la `UNION` de la búsqueda, un cast a `HibernateCriteriaBuilder`.
   2. **Paso 1 — página de IDs**: `repository.findBy(spec, q -> q.as(ProductId.class)
      .page(pageable))`. `ProductId` es una proyección de interfaz con `getId()`. Spring Data
      emite una consulta con orden y `OFFSET/LIMIT` y otra `count`. **Verificar en
@@ -257,6 +265,14 @@ documentación consultada no cierra se marca **«verificar en implementación»*
   distinguen los dos casos (FR-010, SC-005).
 - **Página fuera de rango**: no es error (FR-004); el `count` devuelve el total real y el
   contenido vacío.
+- **Parámetros repetidos o desconocidos** (comportamiento observado en `GET /products` con la
+  base vacía y con datos mínimos, 2026-11-07): los parámetros son escalares, así que Spring
+  usa solo el **primer** valor de `size`, `page`, `type`, `genreId`, `authorId`, `publisherId`,
+  `seriesId`, `minPrice` y `maxPrice` y descarta el resto (`size=10&size=500` responde 200 con
+  tamaño 10; `genreId=A&genreId=B` filtra solo por A; `type=MANGA&type=BOOK` filtra por MANGA y
+  no falla). En `q` y `sort` (texto) los valores repetidos se unen con coma: `sort=price&sort=title,desc`
+  llega como `price,title,desc` y falla el patrón (400, `field: sort`); `q=a&q=b` busca el
+  texto `a,b`. Un parámetro desconocido (`foo=bar`) se ignora (200). Ningún caso produce 500.
 
 ## R10. Datos y estrategia de prueba
 

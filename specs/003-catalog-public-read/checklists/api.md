@@ -12,52 +12,52 @@
 
 ## Paginación y orden
 
-- [ ] CHK001 ¿Está definida la forma exacta de los metadatos de paginación (campos y significado), o "metadatos de paginación" queda abierto a interpretación? [Ambiguity, Spec §FR-001, FR-004]
-- [ ] CHK002 ¿Se especifica el sentido por defecto de cada criterio de orden cuando el cliente omite asc/desc? [Gap, Spec §FR-002]
-- [ ] CHK003 ¿Está definido qué significa "estable y repetible" para empates (criterio de desempate observable) de forma verificable? [Clarity, Spec §FR-002, Edge Cases]
-- [ ] CHK004 ¿Existe un límite superior de `page` en los requisitos, o la regla "página fuera de rango = vacía" es incompatible con rechazar páginas absurdamente grandes? [Conflict, Spec §FR-004 vs Plan R13]
-- [ ] CHK005 ¿Se define el comportamiento ante parámetros repetidos (`size=10&size=20`) o desconocidos (`foo=1`)? [Gap, Spec §FR-008]
-- [ ] CHK006 ¿Está especificado el orden de los autores dentro de una tarjeta/detalle cuando hay varios? [Gap, Spec §FR-003, FR-009]
+- [X] CHK001 ¿Está definida la forma exacta de los metadatos de paginación (campos y significado), o "metadatos de paginación" queda abierto a interpretación? [Ambiguity, Spec §FR-001, FR-004]
+- [X] CHK002 ¿Se especifica el sentido por defecto de cada criterio de orden cuando el cliente omite asc/desc? [Gap, Spec §FR-002]
+- [X] CHK003 ¿Está definido qué significa "estable y repetible" para empates (criterio de desempate observable) de forma verificable? [Clarity, Spec §FR-002, Edge Cases]
+- [X] CHK004 ¿Existe un límite superior de `page` en los requisitos, o la regla "página fuera de rango = vacía" es incompatible con rechazar páginas absurdamente grandes? [Conflict, Spec §FR-004 vs Plan R13]
+- [X] CHK005 ¿Se define el comportamiento ante parámetros repetidos (`size=10&size=20`) o desconocidos (`foo=1`)? [Gap, Spec §FR-008]
+- [X] CHK006 ¿Está especificado el orden de los autores dentro de una tarjeta/detalle cuando hay varios? [Gap, Spec §FR-003, FR-009]
 
 ## Búsqueda
 
-- [ ] CHK007 ¿Se define qué cuenta como "palabra" (separadores, signos, guiones internos como en "Spider-Man") para dividir el texto? [Clarity, Spec §FR-005]
-- [ ] CHK008 ¿Está acotada la longitud máxima del texto y el número máximo de palabras de la búsqueda? [Gap, Spec §FR-005]
-- [ ] CHK009 ¿Se especifica el tratamiento de términos muy cortos (1–2 caracteres) y su efecto esperado en el resultado? [Gap, Spec §FR-005, Edge Cases]
-- [ ] CHK010 ¿Se define si la búsqueda por ISBN exige coincidencia exacta o admite fragmentos, y cómo conviven ambas con la búsqueda por texto? [Ambiguity, Spec §FR-005, US2]
-- [ ] CHK011 ¿Se aclara si un ISBN-10 y su equivalente ISBN-13 deben encontrar el mismo producto y si cuentan como duplicados para la unicidad? [Gap, Spec §FR-017]
-- [ ] CHK012 ¿Está definido el tratamiento de caracteres especiales de búsqueda (`%`, `_`, comillas) como texto literal? [Edge Case, Gap, Spec §FR-005]
-- [ ] CHK013 ¿Hay un criterio de ordenación de resultados cuando se busca (relevancia vs. el orden elegido) o se afirma explícitamente que prima el orden pedido? [Ambiguity, Spec §FR-002, FR-007]
+- [X] CHK007 ¿Se define qué cuenta como "palabra" (separadores, signos, guiones internos como en "Spider-Man") para dividir el texto? [Clarity, Spec §FR-005]
+- [X] CHK008 ¿Está acotada la longitud máxima del texto y el número máximo de palabras de la búsqueda? [Gap, Spec §FR-005]
+- [X] CHK009 ¿Se especifica el tratamiento de términos muy cortos (1–2 caracteres) y su efecto esperado en el resultado? [Gap, Spec §FR-005, Edge Cases]
+- [X] CHK010 ¿Se define si la búsqueda por ISBN exige coincidencia exacta o admite fragmentos, y cómo conviven ambas con la búsqueda por texto? [Ambiguity, Spec §FR-005, US2]
+- [X] CHK011 ¿Se aclara si un ISBN-10 y su equivalente ISBN-13 deben encontrar el mismo producto y si cuentan como duplicados para la unicidad? [Gap, Spec §FR-017]
+- [X] CHK012 ¿Está definido el tratamiento de caracteres especiales de búsqueda (`%`, `_`, comillas) como texto literal? [Edge Case, Gap, Spec §FR-005]
+- [X] CHK013 ¿Hay un criterio de ordenación de resultados cuando se busca (relevancia vs. el orden elegido) o se afirma explícitamente que prima el orden pedido? [Ambiguity, Spec §FR-002, FR-007]
 
 ## Filtros y validación
 
-- [ ] CHK014 ¿Está definido el valor mínimo válido de `minPrice`/`maxPrice` (¿0 es válido? ¿negativos?) y qué ocurre con precios no enteros? [Gap, Spec §FR-006, FR-016]
-- [ ] CHK015 ¿Se define si `minPrice == maxPrice` es un rango válido? [Edge Case, Spec §FR-006]
-- [ ] CHK016 ¿Los requisitos de "error de validación detallado" especifican el contenido mínimo (campo y motivo) y prohíben reflejar el valor recibido? [Clarity, Spec §FR-008, FR-022, SC-006]
-- [ ] CHK017 ¿Se especifica la combinación de varios filtros del mismo tipo (p. ej. dos `genreId`) o se declara que solo se admite uno? [Gap, Spec §FR-006]
-- [ ] CHK018 ¿Es consistente el tratamiento de un identificador bien formado pero inexistente (página vacía en filtros) con el de la serie/producto inexistente (404)? [Consistency, Spec §Edge Cases, FR-010]
+- [X] CHK014 ¿Está definido el valor mínimo válido de `minPrice`/`maxPrice` (¿0 es válido? ¿negativos?) y qué ocurre con precios no enteros? [Gap, Spec §FR-006, FR-016]
+- [X] CHK015 ¿Se define si `minPrice == maxPrice` es un rango válido? [Edge Case, Spec §FR-006]
+- [X] CHK016 ¿Los requisitos de "error de validación detallado" especifican el contenido mínimo (campo y motivo) y prohíben reflejar el valor recibido? [Clarity, Spec §FR-008, FR-022, SC-006]
+- [X] CHK017 ¿Se especifica la combinación de varios filtros del mismo tipo (p. ej. dos `genreId`) o se declara que solo se admite uno? [Gap, Spec §FR-006]
+- [X] CHK018 ¿Es consistente el tratamiento de un identificador bien formado pero inexistente (página vacía en filtros) con el de la serie/producto inexistente (404)? [Consistency, Spec §Edge Cases, FR-010]
 
 ## Detalle, series y clasificaciones
 
-- [ ] CHK019 ¿Están enumerados como obligatorios u opcionales cada campo de la tarjeta y del detalle (sinopsis, portada, páginas, idioma)? [Completeness, Spec §FR-003, FR-009]
-- [ ] CHK020 ¿Se define el formato del idioma y el significado de "informativo" (valores permitidos)? [Ambiguity, Spec §Assumptions]
-- [ ] CHK021 ¿Cubre SC-003 ("sin perder ninguna información que muestra hoy") una lista verificable de los campos del JSON actual del frontend? [Measurability, Spec §SC-003]
-- [ ] CHK022 ¿Está claro qué endpoint(s) satisfacen "consultar la serie" (datos + volúmenes paginados) y cómo se alinea FR-011 con US4? [Consistency, Spec §FR-011, US4]
-- [ ] CHK023 ¿Se establece explícitamente la regla de visibilidad de una serie (≥1 volumen publicado) en un requisito funcional y no solo en Edge Cases/US4? [Completeness, Spec §FR-011, FR-014, Edge Cases]
-- [ ] CHK024 ¿Es inequívoco "indistinguibles entre sí" (¿cuerpo, cabeceras, tiempo?) para el 404 de producto oculto/inexistente? [Clarity, Spec §FR-010, SC-005]
+- [X] CHK019 ¿Están enumerados como obligatorios u opcionales cada campo de la tarjeta y del detalle (sinopsis, portada, páginas, idioma)? [Completeness, Spec §FR-003, FR-009]
+- [X] CHK020 ¿Se define el formato del idioma y el significado de "informativo" (valores permitidos)? [Ambiguity, Spec §Assumptions]
+- [X] CHK021 ¿Cubre SC-003 ("sin perder ninguna información que muestra hoy") una lista verificable de los campos del JSON actual del frontend? [Measurability, Spec §SC-003]
+- [X] CHK022 ¿Está claro qué endpoint(s) satisfacen "consultar la serie" (datos + volúmenes paginados) y cómo se alinea FR-011 con US4? [Consistency, Spec §FR-011, US4]
+- [X] CHK023 ¿Se establece explícitamente la regla de visibilidad de una serie (≥1 volumen publicado) en un requisito funcional y no solo en Edge Cases/US4? [Completeness, Spec §FR-011, FR-014, Edge Cases]
+- [X] CHK024 ¿Es inequívoco "indistinguibles entre sí" (¿cuerpo, cabeceras, tiempo?) para el 404 de producto oculto/inexistente? [Clarity, Spec §FR-010, SC-005]
 
 ## Seguridad y acceso anónimo
 
-- [ ] CHK025 ¿Se enumeran las rutas y métodos HTTP exactos de acceso anónimo (incluyendo HEAD y OPTIONS), en lugar de "cualquier endpoint de lectura"? [Clarity, Spec §FR-021, US6]
-- [ ] CHK026 ¿Está definido qué ocurre si un `GET` público llega con un token inválido o caducado? [Gap, Spec §US6]
-- [ ] CHK027 ¿Se aclara la frase "dentro de lo permitido por la constitución" con la regla concreta de Constitución V que lo respalda? [Ambiguity, Spec §FR-021]
-- [ ] CHK028 ¿Se declara explícitamente que los métodos de escritura sobre estas rutas quedan denegados hasta la feature 004? [Gap, Spec §FR-021, Out of Scope]
+- [X] CHK025 ¿Se enumeran las rutas y métodos HTTP exactos de acceso anónimo (incluyendo HEAD y OPTIONS), en lugar de "cualquier endpoint de lectura"? [Clarity, Spec §FR-021, US6]
+- [X] CHK026 ¿Está definido qué ocurre si un `GET` público llega con un token inválido o caducado? [Gap, Spec §US6]
+- [X] CHK027 ¿Se aclara la frase "dentro de lo permitido por la constitución" con la regla concreta de Constitución V que lo respalda? [Ambiguity, Spec §FR-021]
+- [X] CHK028 ¿Se declara explícitamente que los métodos de escritura sobre estas rutas quedan denegados hasta la feature 004? [Gap, Spec §FR-021, Out of Scope]
 
 ## Rendimiento y supuestos
 
-- [ ] CHK029 ¿Están acotadas las condiciones de medición de SC-002 (hardware, caché fría/caliente, concurrencia, qué consultas cuentan como "con búsqueda y filtros")? [Measurability, Spec §SC-002]
-- [ ] CHK030 ¿Está justificada la exclusión de limitación de tasa con el riesgo de abuso de búsquedas costosas en endpoints anónimos? [Assumption, Spec §Clarifications, Assumptions]
-- [ ] CHK031 ¿Se documenta la zona horaria/formato de `fecha de publicación` y de `fecha de incorporación` usadas para ordenar? [Gap, Spec §FR-002]
+- [X] CHK029 ¿Están acotadas las condiciones de medición de SC-002 (hardware, caché fría/caliente, concurrencia, qué consultas cuentan como "con búsqueda y filtros")? [Measurability, Spec §SC-002]
+- [X] CHK030 ¿Está justificada la exclusión de limitación de tasa con el riesgo de abuso de búsquedas costosas en endpoints anónimos? [Assumption, Spec §Clarifications, Assumptions]
+- [X] CHK031 ¿Se documenta la zona horaria/formato de `fecha de publicación` y de `fecha de incorporación` usadas para ordenar? [Gap, Spec §FR-002]
 
 ## Notes
 

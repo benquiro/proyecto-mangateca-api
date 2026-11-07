@@ -79,6 +79,34 @@ X.509 (`BEGIN PUBLIC KEY`).
 Si faltan o son inválidas, la aplicación arranca igualmente sin crear el administrador y emite
 un aviso sin datos sensibles. Nunca versiones valores reales.
 
+## Catálogo público
+
+Lectura anónima (sin token) de productos publicados. Cada `GET` acepta también `HEAD`; cualquier
+otro método responde 401.
+
+| Ruta | Descripción |
+|------|-------------|
+| `GET /api/v1/products` | Listado con búsqueda (`q`), filtros (`type`, `genreId`, `authorId`, `publisherId`, `seriesId`, `minPrice`, `maxPrice`) y `sort` |
+| `GET /api/v1/products/{id}` | Detalle de un producto publicado |
+| `GET /api/v1/series` | Series con al menos un volumen publicado |
+| `GET /api/v1/series/{id}` | Datos de una serie |
+| `GET /api/v1/series/{id}/volumes` | Volúmenes publicados de una serie, por número de volumen |
+| `GET /api/v1/genres` | Géneros con productos publicados |
+| `GET /api/v1/authors` | Autores con productos publicados |
+| `GET /api/v1/publishers` | Editoriales con productos publicados |
+
+Todos los listados son paginados: `page` desde 0 y `size` de 20 por defecto, con máximo 100 (un
+valor mayor responde 400, no se ajusta en silencio). La respuesta lleva `content` y `page`. Un
+producto no publicado y uno inexistente responden el mismo 404.
+
+### Extensiones de PostgreSQL
+
+La migración V3 ejecuta `CREATE EXTENSION IF NOT EXISTS unaccent` y `pg_trgm` (búsqueda sin
+tildes y parcial). Ambas son extensiones de confianza (*trusted*) desde PostgreSQL 13, así que
+las puede crear el dueño de la base de datos; si el usuario de la aplicación no lo es, un
+superusuario debe crearlas antes del primer arranque. En local (`postgres:18` de
+`compose.yaml`) no hace falta nada.
+
 ## Pruebas
 
 ```bash

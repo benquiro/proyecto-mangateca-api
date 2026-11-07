@@ -4,6 +4,22 @@
 #  - ProblemDetail: el esquema generado es el de Spring (campo `properties` libre). En runtime
 #    las extensiones se aplanan en el nivel raiz (p. ej. `errors`), como describe este contrato.
 #  - Seguridad: el generado declara bearerAuth global y `security: []` en estas operaciones.
+#  - Esquemas de pagina: el generado los llama PageResponseProductSummaryResponse,
+#    PageResponseSeriesResponse y PageResponseNamedResponse (contrato: ProductSummaryPage,
+#    SeriesPage, NamedPage); misma forma `content` + `page`. En el generado el 200 de los seis
+#    listados paginados declara el media type `*/*` (springdoc infiere el esquema del tipo de
+#    retorno); declarar `application/json` en @ApiResponse hace perder el esquema, y fijar
+#    `produces` cambiaria el comportamiento HTTP, asi que se acepta.
+#  - Esquemas generados sin `required`, sin `minimum`/`example`/`description` de campos, con
+#    `format: int32` en enteros y sin `nullable` ni `oneOf` con null en `series`, `volumeNumber`
+#    e `isbn` (la ausencia/null se documenta aqui y en las descripciones).
+#  - Parametros: `page`/`size` generados con minimum/maximum pero sin `default` (0 y 20 se
+#    documentan en este contrato); `minPrice`/`maxPrice` como `exclusiveMinimum: 0`
+#    (equivale a `minimum: 1`); `sort` con `pattern` pero sin `default`.
+#  - Orden de los parametros de listProducts distinto (page, size, sort, q, ...): irrelevante.
+# Verificado contra /v3/api-docs el 2026-11-06 (T063): ocho rutas, parametros, 200/400/404,
+# forma `content` + `page`, `security: []` en las ocho operaciones y ProblemDetail
+# (`application/problem+json`) coinciden con el contrato salvo lo listado arriba.
 openapi: 3.1.0
 info:
   title: Mangateca API - Catalog (Public Read)
@@ -40,7 +56,13 @@ paths:
         aparecer, de forma parcial, en el titulo o en el nombre de algun autor. Ademas, si
         `q` completo (sin guiones ni espacios) es exactamente el ISBN de un producto, ese
         producto tambien coincide. `q` vacio o solo con espacios equivale a no buscar.
+        Una palabra es una secuencia separada por espacios en blanco; la puntuacion interna se
+        conserva (`spider-man` es una sola palabra). `q` admite hasta 100 caracteres.
         Orden por defecto: `createdAt,desc`. El orden es estable (desempate por id).
+        Los parametros son de un solo valor: si se repite uno (`genreId`, `type`, `size`, ...) se
+        usa el primero y se ignoran los demas; en `q` y `sort` los valores repetidos se unen con
+        coma (`sort` repetido resulta en 400). Los parametros desconocidos se ignoran.
+        Los autores de cada tarjeta se devuelven ordenados por nombre ascendente y, a igual nombre, por id.
       security: []
       parameters:
         - name: q
@@ -304,6 +326,7 @@ components:
         title: { type: string, example: Dragon Ball 3 }
         type: { $ref: '#/components/schemas/ProductType' }
         authors:
+          description: Ordenados por nombre ascendente y, a igual nombre, por id.
           type: array
           items: { $ref: '#/components/schemas/NamedResponse' }
         price:
@@ -331,10 +354,12 @@ components:
         type: { $ref: '#/components/schemas/ProductType' }
         synopsis: { type: string }
         authors:
+          description: Ordenados por nombre ascendente y, a igual nombre, por id.
           type: array
           items: { $ref: '#/components/schemas/NamedResponse' }
         publisher: { $ref: '#/components/schemas/NamedResponse' }
         genres:
+          description: Ordenados por nombre ascendente y, a igual nombre, por id.
           type: array
           items: { $ref: '#/components/schemas/NamedResponse' }
         isbn:
@@ -343,10 +368,13 @@ components:
           example: '9784088820118'
         language:
           type: string
-          description: Informativo.
+          description: Texto libre de hasta 35 caracteres (codigo corto tipo BCP 47, p. ej. `es`, `ja`); informativo, no se valida el formato.
           example: es
         pageCount: { type: integer, minimum: 1 }
-        publicationDate: { type: string, format: date }
+        publicationDate:
+          type: string
+          format: date
+          description: Fecha de calendario ISO-8601 sin zona horaria. La fecha de incorporacion (`createdAt`) solo se usa para ordenar y no se expone.
         price:
           type: integer
           format: int64

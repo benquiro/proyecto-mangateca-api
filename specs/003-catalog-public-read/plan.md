@@ -17,8 +17,11 @@ Decisiones clave (detalle en [research.md](research.md)):
 1. **Búsqueda con PostgreSQL nativo**: `unaccent` + `pg_trgm`. Una función envoltorio
    `IMMUTABLE` (`catalog_normalize`) permite índices GIN de trigramas sobre el título y el
    nombre de autor normalizados. Cada palabra del texto es un `LIKE '%palabra%'` sobre esa
-   función; un producto coincide si **todas** las palabras aparecen en el título o en algún
-   autor, o si el texto completo (sin guiones ni espacios) es exactamente su ISBN (R1, R2).
+   función. Por cada palabra, el predicado es `id IN (subconsulta de título UNION subconsulta
+   de autor)`, construido con `HibernateCriteriaBuilder.union`, para que cada rama use su
+   índice de trigramas (un `OR` con `EXISTS` correlacionado lo impedía). Un producto coincide
+   si **todas** las palabras aparecen en el título o en algún autor, o si el texto completo
+   (sin guiones ni espacios) es exactamente su ISBN (R1, R2).
 2. **Todos los filtros son subconsultas `EXISTS`** dentro de `Specification`s. Así no hay
    uniones que multipliquen filas: ni `DISTINCT` ni duplicados por autores o géneros (R3).
 3. **Consulta en dos pasos**: (1) página de IDs con filtros, orden y `count`; (2) carga de esos
@@ -41,8 +44,9 @@ Decisiones clave (detalle en [research.md](research.md)):
 
 **Primary Dependencies**: Spring Boot 4.1.2 (Spring Data JPA 4.1, Hibernate 7, Security 7),
 Spring Modulith 2.1.2, MapStruct 1.6.3, springdoc-openapi 3.2.0. **Sin dependencias nuevas.**
-Specifications con la API nativa de Spring Data JPA 4 (`Specification`, `JpaSpecificationExecutor`,
-`findBy` fluido); sin generador de metamodelo (se usan nombres de atributo como cadenas).
+Specifications de Spring Data JPA 4 (`Specification`, `JpaSpecificationExecutor`, `findBy`
+fluido) más un cast puntual a `HibernateCriteriaBuilder` para la `UNION` de la búsqueda de
+texto (Hibernate ya es dependencia transitiva); sin generador de metamodelo (se usan nombres de atributo como cadenas).
 
 **Storage**: PostgreSQL 18; migración `V3__create_catalog.sql` (V1 y V2 intactas). V1 **no**
 crea extensiones (solo `event_publication`), así que V3 ejecuta
@@ -80,7 +84,7 @@ decimales.
 | II | Invariantes en el dominio | `Money` (monto > 0, escala 0) e `Isbn` (formato y dígito verificador) en constructores compactos. Serie/volumen y ≥1 autor/género se protegen con CHECK y FK en V3; la fábrica de `Product` llega con la feature 004, que es la que crea productos (R14) | ✅ |
 | II | Dinero en `BigDecimal`/`Money` | `Money` record sobre `BigDecimal` con escala 0; columna `numeric(12,0)` | ✅ |
 | II | Identificadores de negocio como VO `record` | `Isbn` | ✅ |
-| III | Java 25, Boot 4.1.x, solo APIs estables | Specifications, `findBy` fluido, `EXISTS`; ninguna API preview ni deprecada | ✅ |
+| III | Java 25, Boot 4.1.x, solo APIs estables | Specifications, `findBy` fluido, `EXISTS`; también `HibernateCriteriaBuilder.union` (no es `@Incubating` en hibernate-core 7.4.13); ninguna API preview ni deprecada | ✅ |
 | III | No eliminar dependencias base; ADR por dependencia nueva | Ninguna dependencia nueva ni eliminada; no hay ADR | ✅ |
 | III | DTO, comandos, eventos y VO como `record` | Todos los DTO (incluida la respuesta paginada `PageResponse<T>`), `ProductSearchCriteria`, `Money`, `Isbn`, `PageParams`, `ProductSearchRequest` | ✅ |
 | III | Lombok solo en entidades; sin `@Data` | `@Getter` únicamente en las cinco entidades | ✅ |
@@ -121,6 +125,7 @@ interfaces, dependencias, caché ni rutas anónimas fuera de `GET`/`HEAD` sobre 
 | Función SQL `catalog_normalize` (V3) | `unaccent` no es `IMMUTABLE`, por lo que no se puede indexar; sin ella no hay índice de trigramas sobre texto sin tildes | `unaccent()` directo en la consulta: recorrido secuencial en cada búsqueda | 1 función SQL; si cambia el diccionario de `unaccent` hay que reindexar (R2) |
 | Consulta en dos pasos (IDs + carga) | Hibernate pagina en memoria si se mezclan `fetch join` de colecciones y paginación | `fetch join` + `Pageable` en una consulta: carga todo el resultado en memoria | 2 consultas más 1 `count` por listado; reordenar la lista cargada |
 | `ProductSpecifications` (clase estática con predicados `EXISTS`) | Filtros combinables y opcionales sin multiplicar métodos de repositorio | Un método derivado por combinación (2⁷ posibles) o `@Query` con `:p IS NULL OR …` | Atributos por nombre (cadenas); un error se descubre en test, no al compilar |
+| `UNION` con `HibernateCriteriaBuilder.union` en la búsqueda de texto (`ProductSpecifications.wordMatches`) | El `OR` con `EXISTS` correlacionado impide el `BitmapOr`: Postgres hacía `Seq Scan` sobre `products` y no usaba `products_title_trgm_idx` (detectado en T064) | JPA puro (no permite `UNION` en subconsultas) y SQL nativo (se pierde la composición con `Specification`s y la paginación/`count`) | `domain` queda acoplado a `org.hibernate.query.criteria` y el cast falla si cambia el proveedor JPA; `union` no es `@Incubating` en hibernate-core 7.4.13 y Hibernate ya es dependencia transitiva, así que no hace falta ADR. Evidencia: planes y p95 de [quickstart.md](quickstart.md) §6.7 |
 | `ProductSearchCriteria` (record) | Aislar `application`/`domain` de los tipos HTTP (`ProductSearchRequest`) | Pasar el record web al servicio: el dominio dependería de `web` | 1 record y 1 conversión |
 | `PageParams` + `ProductSearchRequest` (records con Bean Validation) | `Pageable` recortaría `size > 100` en silencio en vez de rechazarlo | `spring.data.web.pageable.max-page-size`: ajusta el valor, no devuelve 400 | 2 records; construir el `PageRequest` a mano |
 | `@ValidPriceRange` (anotación de clase + validador) | `minPrice > maxPrice` debe reportar el parámetro `minPrice` | Comprobarlo en el controlador y lanzar una excepción: segunda ruta de error | 1 anotación + 1 validador (mismo patrón que `@ValidPassword`) |

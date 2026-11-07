@@ -57,14 +57,14 @@ son `UUID` asignados por la aplicación (esta feature no inserta).
 | `synopsis` | `TEXT` | no | Sinopsis |
 | `price` | `NUMERIC(12,0)` | no | `CHECK (price > 0)`; CLP sin decimales |
 | `isbn` | `VARCHAR(13)` | sí | `CHECK (isbn ~ '^([0-9]{9}[0-9X]\|[0-9]{13})$')`; `UNIQUE`. El dígito verificador lo valida el VO `Isbn`, no la BD |
-| `language` | `VARCHAR(35)` | no | Informativo (p. ej. `es`, `ja`); no es filtro |
+| `language` | `VARCHAR(35)` | no | Texto libre de hasta 35 caracteres, pensado como código corto tipo BCP 47 (p. ej. `es`, `ja`). No se valida el formato en la 003 (solo lectura) y no es filtro |
 | `page_count` | `INTEGER` | no | `CHECK (page_count > 0)` |
-| `publication_date` | `DATE` | no | Fecha de publicación |
+| `publication_date` | `DATE` | no | Fecha de publicación: fecha de calendario ISO-8601 sin zona horaria |
 | `cover_url` | `VARCHAR(2048)` | no | URL de la portada |
 | `publisher_id` | `UUID` | no | `FK → publishers(id)` |
 | `series_id` | `UUID` | sí | `FK → series(id)` |
 | `volume_number` | `INTEGER` | sí | `CHECK (volume_number > 0)` |
-| `created_at` | `TIMESTAMPTZ` | no | Fecha de incorporación al catálogo («novedades») |
+| `created_at` | `TIMESTAMPTZ` | no | Fecha de incorporación al catálogo («novedades»): un instante (UTC). Solo se usa para ordenar; no se expone en la API |
 
 Restricciones adicionales:
 
@@ -122,7 +122,7 @@ asociaciones `LAZY`.
 
 | Entidad | Tabla | Atributos | Relaciones |
 |---------|-------|-----------|------------|
-| `Product` | `products` | `id`, `type` (`ProductType`, `@Enumerated(STRING)`), `status` (`PublicationStatus`), `title`, `synopsis`, `price` (`Money`), `isbn` (`@Nullable Isbn`), `language`, `pageCount`, `publicationDate`, `coverUrl`, `volumeNumber` (`@Nullable Integer`), `createdAt` | `@ManyToOne(LAZY) publisher`; `@ManyToOne(LAZY) @Nullable series`; `@ManyToMany authors` (`@JoinTable product_authors`, `@OrderBy("name")`); `@ManyToMany genres` (`@JoinTable product_genres`, `@OrderBy("name")`) |
+| `Product` | `products` | `id`, `type` (`ProductType`, `@Enumerated(STRING)`), `status` (`PublicationStatus`), `title`, `synopsis`, `price` (`Money`), `isbn` (`@Nullable Isbn`), `language`, `pageCount`, `publicationDate`, `coverUrl`, `volumeNumber` (`@Nullable Integer`), `createdAt` | `@ManyToOne(LAZY) publisher`; `@ManyToOne(LAZY) @Nullable series`; `@ManyToMany authors` (`@JoinTable product_authors`, `@OrderBy("name, id")`); `@ManyToMany genres` (`@JoinTable product_genres`, `@OrderBy("name, id")`) |
 | `Author` | `authors` | `id`, `name` | — (sin lado inverso) |
 | `Publisher` | `publishers` | `id`, `name` | — |
 | `Genre` | `genres` | `id`, `name` | — |

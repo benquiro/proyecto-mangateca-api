@@ -180,7 +180,7 @@ Como lector de manga, quiero ver todos los volúmenes de una serie en orden, par
 Scenario: Serie con un volumen no publicado
   Given una serie con los volúmenes 1, 2 y 3
   And el volumen 2 no está publicado
-  When un visitante consulta la serie
+  When un visitante consulta la serie (sus datos y su lista de volúmenes, FR-011)
   Then ve su nombre y descripción
   And ve solo los volúmenes 1 y 3, en ese orden
 
@@ -262,6 +262,8 @@ Scenario: Mismo catálogo para todos los roles
 - Número de página negativo o tamaño de página cero o negativo: error de validación.
 - Filtro por un identificador de clasificación inexistente (pero bien formado): página vacía, no error.
 - Filtro con identificador de formato inválido: error de validación.
+- Parámetro repetido (`size=10&size=20`, `genreId=A&genreId=B`, `type=MANGA&type=LIBRO`, `minPrice` repetido): los parámetros son de un solo valor, de modo que se usa solo el **primero** y se ignoran los demás (no hay filtro «uno u otro»). En `q` y `sort`, que son texto, los valores repetidos se unen con coma en un solo valor: `sort=price&sort=title,desc` equivale a `price,title,desc` y se rechaza con 400 (orden no permitido); `q=a&q=b` busca el texto `a,b`.
+- Parámetro desconocido (`foo=bar`): se ignora; la respuesta es la misma que sin él.
 - Productos con el mismo valor en el criterio de orden: el orden entre ellos es estable y repetible entre consultas.
 - Un producto sin ISBN: no aparece en búsquedas por ISBN, pero sí por título o autor.
 - Un producto con varios autores: aparece al filtrar o buscar por cualquiera de ellos y no se duplica en los resultados.
@@ -274,25 +276,25 @@ Scenario: Mismo catálogo para todos los roles
 **Listado y paginación**
 
 - **FR-001**: El listado de productos MUST ser público y siempre paginado. El tamaño de página por defecto MUST ser 20 y el máximo 100; un tamaño mayor MUST rechazarse con error de validación.
-- **FR-002**: El listado MUST poder ordenarse por título, precio, fecha de publicación y fecha de incorporación al catálogo (novedades), en ambos sentidos. Sin orden explícito, MUST mostrar primero las novedades. Si se indica el criterio sin sentido, el sentido es ascendente. El orden MUST ser estable entre productos con el mismo valor.
-- **FR-003**: Cada elemento del listado MUST mostrar lo necesario para una tarjeta de producto: identificador, título, tipo (manga, libro o cómic), autores, precio, portada y, si pertenece a una serie, su nombre y número de volumen.
+- **FR-002**: El listado MUST poder ordenarse por título, precio, fecha de publicación y fecha de incorporación al catálogo (novedades), en ambos sentidos. Sin orden explícito, MUST mostrar primero las novedades. Si se indica el criterio sin sentido, el sentido es ascendente. El orden MUST ser estable entre productos con el mismo valor. La fecha de publicación es una fecha de calendario ISO-8601 sin zona horaria (`2020-01-31`); la fecha de incorporación es un instante (`TIMESTAMPTZ`, UTC) que solo se usa para ordenar y no se expone en ninguna respuesta.
+- **FR-003**: Cada elemento del listado MUST mostrar lo necesario para una tarjeta de producto: identificador, título, tipo (manga, libro o cómic), autores, precio, portada y, si pertenece a una serie, su nombre y número de volumen. Los autores (y, en el detalle, los géneros) se devuelven ordenados por nombre ascendente y, a igual nombre, por id.
 - **FR-004**: Una página fuera de rango MUST devolver una página vacía con los metadatos de paginación, no un error. El número de página admite como máximo 1.000.000; un valor mayor es un parámetro inválido (FR-008), no una página fuera de rango.
 
 **Búsqueda y filtros**
 
-- **FR-005**: La búsqueda por texto MUST encontrar productos por título, nombre de autor o ISBN, sin distinguir mayúsculas ni tildes. Con varias palabras, cada una MUST coincidir en alguno de esos campos, y la coincidencia es parcial (p. ej. "drag" encuentra "Dragón").
+- **FR-005**: La búsqueda por texto MUST encontrar productos por título, nombre de autor o ISBN, sin distinguir mayúsculas ni tildes. Con varias palabras, cada una MUST coincidir en alguno de esos campos, y la coincidencia es parcial (p. ej. "drag" encuentra "Dragón"). Una «palabra» es cada secuencia de caracteres separada por espacios en blanco; la puntuación interna se conserva literal (`spider-man` es una sola palabra; como la coincidencia es parcial por palabra, tanto `spider-man` como `spider man` encuentran «Spider-Man»). El texto admite como máximo 100 caracteres (si lo supera, 400 según FR-008), lo que acota también el número de palabras.
 - **FR-006**: El listado MUST admitir filtros combinables por tipo de producto, género, autor, editorial, serie y rango de precio (mínimo y máximo, ambos opcionales e inclusivos).
 - **FR-007**: Búsqueda y filtros MUST combinarse entre sí y con la paginación y el orden. Un producto MUST aparecer una sola vez en los resultados aunque coincida por varios autores o géneros.
 - **FR-008**: Los parámetros inválidos (precio mínimo mayor que el máximo, tipo inexistente, orden no permitido, paginación inválida, identificadores mal formados) MUST rechazarse con error de validación detallado que identifique cada parámetro afectado.
 
 **Detalle**
 
-- **FR-009**: El detalle de producto MUST incluir: título, tipo, sinopsis, autores, editorial, géneros, ISBN, idioma, número de páginas, fecha de publicación, precio, portada y, si aplica, serie y número de volumen.
+- **FR-009**: El detalle de producto MUST incluir: título, tipo, sinopsis, autores, editorial, géneros, ISBN, idioma, número de páginas, fecha de publicación, precio, portada y, si aplica, serie y número de volumen. Autores y géneros se devuelven ordenados por nombre ascendente y, a igual nombre, por id.
 - **FR-010**: Un producto inexistente o no publicado MUST responder "no encontrado" con una respuesta indistinguible entre ambos casos. Nunca MUST revelarse que existe un producto oculto.
 
 **Series**
 
-- **FR-011**: Una serie MUST mostrar su nombre, descripción y sus volúmenes publicados ordenados por número de volumen ascendente. Los volúmenes MUST paginarse con el mismo tamaño por defecto y máximo que FR-001.
+- **FR-011**: «Consultar una serie» se atiende con dos recursos: `GET /api/v1/series/{id}` devuelve sus datos (nombre y descripción) y `GET /api/v1/series/{id}/volumes` devuelve sus volúmenes publicados, ordenados por número de volumen ascendente y paginados con el mismo tamaño por defecto y máximo que FR-001. Una serie sin volúmenes publicados no es visible: su detalle y sus volúmenes responden 404.
 - **FR-012**: El detalle de un volumen MUST permitir llegar a su serie.
 
 **Clasificaciones**
@@ -327,8 +329,8 @@ Scenario: Mismo catálogo para todos los roles
 ### Measurable Outcomes
 
 - **SC-001**: Un visitante encuentra un producto por título, autor o ISBN en una sola búsqueda, sin combinar filtros.
-- **SC-002**: Con un catálogo de 10.000 productos publicados, el 95 % de las consultas de listado (con o sin búsqueda y filtros) responde en menos de 500 ms.
-- **SC-003**: El frontend puede reemplazar su JSON local por esta API sin perder ninguna información que muestra hoy (tarjeta y detalle de producto, series y menús de filtros).
+- **SC-002**: Con un catálogo de 10.000 productos publicados, el 95 % de las consultas de listado (con o sin búsqueda y filtros) responde en menos de 500 ms. Condiciones de medición en quickstart §6: un solo cliente, peticiones secuenciales, caché caliente tras `ANALYZE`, entorno local de desarrollo; concurrencia e infraestructura quedan fuera.
+- **SC-003**: El frontend puede reemplazar su JSON local por esta API sin perder ninguna información que muestra hoy (tarjeta y detalle de producto, series y menús de filtros). Se verifica en la feature 012 contra la lista de campos de FR-003 (tarjeta) y FR-009 (detalle).
 - **SC-004**: El 100 % de las consultas públicas se resuelve sin credenciales y ningún producto no publicado es visible en ninguna respuesta.
 - **SC-005**: Las respuestas "no encontrado" para un producto no publicado y para uno inexistente son idénticas en contenido y forma.
 - **SC-006**: El 100 % de las solicitudes con parámetros inválidos recibe un error que identifica el parámetro y el motivo.
@@ -338,7 +340,8 @@ Scenario: Mismo catálogo para todos los roles
 - Moneda única CLP sin decimales; no existen otras monedas ni conversión (confirmado).
 - Un producto pertenece como máximo a una serie (confirmado).
 - El idioma es un dato informativo del producto, no un filtro (confirmado).
-- No se aplica limitación de tasa a los endpoints públicos en esta feature.
+- `language` es texto libre de hasta 35 caracteres, pensado como código corto tipo BCP 47 (`es`, `ja`); es informativo y la 003 no valida su formato.
+- No se aplica limitación de tasa a los endpoints públicos en esta feature. El coste máximo de una búsqueda anónima está acotado (`q` ≤ 100 caracteres, `size` ≤ 100, peor caso medido en quickstart §6.7) y el rate limiting se difiere a una feature transversal.
 - Las reglas de dominio que se comprueban al crear o editar un producto, en particular FR-019 (≥ 1 autor y ≥ 1 género), se aplican en la feature 004, que es la única que escribe en el catálogo. Esta feature solo lee; la base de datos protege lo que puede expresarse con restricciones (tipo, precio, ISBN, serie y volumen).
 - Los endpoints de lectura aceptan `GET` y `HEAD` (y `OPTIONS` para CORS) sin credenciales.
 - La comprobación de SC-003 contra el JSON actual del frontend se hace al migrar esos datos (feature 012).
