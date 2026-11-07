@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -222,6 +223,23 @@ class ProductSearchIT {
 		assertThat(page.getContent()).extracting(Product::getTitle).containsExactly("Dragón 3", "Dragón 2");
 		assertThat(page.getTotalElements()).isEqualTo(5);
 		assertThat(page.getTotalPages()).isEqualTo(3);
+	}
+
+	@ParameterizedTest
+	@CsvSource(delimiter = '|', value = { "%|100% Real", "_|a_b", "a_b|a_b", "\\|Ruta\\Manga" })
+	@DisplayName("FR-005: los caracteres %, _ y \\ del texto de búsqueda se tratan como literales en el LIKE")
+	void shouldTreatLikeWildcardsAsLiterals(String term, String expectedTitle) {
+		this.data.product("100% Real", this.publisher).insert();
+		this.data.product("1000 Real", this.publisher).insert();
+		this.data.product("a_b", this.publisher).insert();
+		this.data.product("axb", this.publisher).insert();
+		this.data.product("Ruta\\Manga", this.publisher).insert();
+		this.data.product("Naruto", this.publisher).insert();
+
+		Page<Product> page = search(text(term));
+
+		assertThat(page.getContent()).extracting(Product::getTitle).containsExactly(expectedTitle);
+		assertThat(page.getTotalElements()).isEqualTo(1);
 	}
 
 	@Test
