@@ -270,6 +270,9 @@ El criterio de rendimiento (p95 < 500 ms con 10.000 productos) se verifica a man
   Ambos casos se prueban a través de los escenarios que los exigen (`ProductControllerTests`:
   `type=XYZ`, `genreId=abc` y UUID de ruta mal formado), sin tests propios en
   `GlobalExceptionHandlerTests` (serían opcionales, VI).
+  Aclaración: la regla de no repetir el valor rechazado (FR-022 / SC-005) se aplica a `detail`,
+  `errors` y demás propiedades del cuerpo; `instance` (URI de la petición, presente en todo
+  `ProblemDetail`) queda fuera de la regla porque puede contener el id del path.
 - **OpenAPI**: los controladores de `catalog` se anotan sin requisito de seguridad
   (`@SecurityRequirements`), porque `OpenApiConfiguration` aplica `bearerAuth` globalmente.
 - **Migraciones**: V1 y V2 no se tocan.
