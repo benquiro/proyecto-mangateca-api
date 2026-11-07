@@ -431,4 +431,6 @@ Task: "T028 NamedResponse y ProductSummaryResponse en src/main/java/com/mangatec
 - Sin caché, rate limiting ni optimizaciones especulativas (Principio VII); sin fachada pública (R11).
 - Excluidos por ser tests opcionales (VI): `CatalogConstraintsIT` (CHECK/UNIQUE de V3),
   `GlobalExceptionHandlerTests` de los dos ajustes (cubiertos por T033 y T039) y los casos borde
-  sin escenario Given-When-Then (escape de `%`/`_`, términos de 1–2 caracteres, texto en blanco).
+  sin escenario Given-When-Then (términos de 1–2 caracteres, texto en blanco). El escape de
+  `%`/`_`/`\` y el ISBN con dígito verificador inválido sí se cubren en `ProductSearchIT`
+  (añadidos tras la revisión de la fase US2).

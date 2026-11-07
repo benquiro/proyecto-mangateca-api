@@ -233,8 +233,9 @@ lo trata como módulo sin API pública. No se crean fachadas ni interfaces (Prin
 | US6 acceso sin token; mismo catálogo para CUSTOMER y ADMIN | `CatalogSecurityIT` | `@SpringBootTest` |
 | FR-005/FR-007/FR-020 dentro de los escenarios de US2: varias palabras en cualquier orden, parcial, ISBN con y sin guiones, producto con varios autores sin duplicar, no publicados nunca visibles | `ProductSearchIT` | `@DataJpaTest` |
 | Edge: paginación inválida (`size=0`, `page=-1`) e identificador de filtro mal formado (`genreId=abc`) | `ProductControllerTests` (filas extra del parametrizado de US2 «Parámetros inválidos») | `@WebMvcTest` |
+| Edge (añadidos tras la revisión de la fase US2): `%`, `_` y `\` del texto se tratan como literales en el `LIKE` (FR-005, R1); texto con forma de ISBN y dígito verificador inválido → página vacía, sin error (R1) | `ProductSearchIT` | `@DataJpaTest` + Testcontainers |
 | Sin N+1 (IV) | `ProductQueryServiceIT`: estadísticas de Hibernate, número de sentencias constante para páginas de 1 y de 20 | servicio |
-| Restricciones de V3 (FR-015..FR-018) | Sin test propio (opcional, VI): las protege V3 y las invariantes de `Money`/`Isbn` tienen sus tests unitarios obligatorios. Excluidos también los casos borde sin escenario (escape de `%`/`_`, términos de 1–2 caracteres, texto en blanco) | — |
+| Restricciones de V3 (FR-015..FR-018) | Sin test propio (opcional, VI): las protege V3 y las invariantes de `Money`/`Isbn` tienen sus tests unitarios obligatorios. Excluidos también los casos borde sin escenario (términos de 1–2 caracteres, texto en blanco) | — |
 
 ### Mocks y dobles permitidos
 
