@@ -258,4 +258,49 @@ class ProductQueryServiceIT {
 		assertThat(a.getBody().getDetail()).doesNotContain(unpublished.toString());
 	}
 
+	static Stream<Sort> volumesPageableSorts() {
+		return Stream.of(Sort.unsorted(), Sort.by(Sort.Direction.DESC, "volumeNumber"),
+				Sort.by(Sort.Direction.DESC, "title"), Sort.by("volumeNumber"));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("volumesPageableSorts")
+	@DisplayName("US4 Escenario 1 / FR-011, FR-020 (T045): solo publicados [1, 3], por número ascendente, ignora el Sort del Pageable")
+	void shouldReturnOnlyPublishedVolumesOrderedByNumberRegardlessOfPageableSort(Sort sort) {
+		UUID series = this.data.series("Serie Test", "Descripción");
+		this.data.product("Volumen 3", this.publisher).series(series, 3).insert();
+		this.data.product("Volumen 2", this.publisher)
+			.series(series, 2)
+			.status(PublicationStatus.UNPUBLISHED)
+			.insert();
+		this.data.product("Volumen 1", this.publisher).series(series, 1).insert();
+		this.entityManager.clear();
+
+		Page<Product> page = this.service.volumes(series, PageRequest.of(0, 20, sort));
+
+		assertThat(page.getContent()).extracting(Product::getVolumeNumber).containsExactly(1, 3);
+		assertThat(page.getTotalElements()).isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("US4 Escenario 3 / FR-011: serie inexistente lanza CatalogNotFoundException")
+	void shouldThrowNotFoundWhenSeriesDoesNotExist() {
+		Throwable thrown = catchThrowable(
+				() -> this.service.volumes(UUID.randomUUID(), PageRequest.of(0, 20, Sort.by("volumeNumber"))));
+
+		assertThat(thrown).isInstanceOf(CatalogNotFoundException.class);
+	}
+
+	@Test
+	@DisplayName("US4 Escenario 3 / FR-011, FR-020: serie sin volúmenes publicados lanza CatalogNotFoundException")
+	void shouldThrowNotFoundWhenSeriesHasNoPublishedVolumes() {
+		UUID series = this.data.series("Serie Vacía", "Descripción");
+		this.data.product("Borrador", this.publisher).series(series, 1).status(PublicationStatus.UNPUBLISHED).insert();
+		this.entityManager.clear();
+
+		Throwable thrown = catchThrowable(() -> this.service.volumes(series, PageRequest.of(0, 20, Sort.by("volumeNumber"))));
+
+		assertThat(thrown).isInstanceOf(CatalogNotFoundException.class);
+	}
+
 }

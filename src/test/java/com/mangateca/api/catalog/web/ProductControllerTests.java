@@ -37,6 +37,7 @@ import com.mangateca.api.catalog.domain.Genre;
 import com.mangateca.api.catalog.domain.Isbn;
 import com.mangateca.api.catalog.domain.Product;
 import com.mangateca.api.catalog.domain.ProductSearchCriteria;
+import com.mangateca.api.catalog.domain.Series;
 import com.mangateca.api.catalog.support.CatalogFixtures;
 import com.mangateca.api.identity.config.IdentitySecurityConfiguration;
 import com.mangateca.api.identity.config.JwtKeyConfiguration;
@@ -281,6 +282,23 @@ class ProductControllerTests {
 		MvcTestResult result = this.mvc.get().uri(PRODUCTS + "/no-es-un-uuid").exchange();
 
 		assertInvalidParameter(result, "id", "no-es-un-uuid");
+	}
+
+	@Test
+	@DisplayName("US4 Escenario 2 / FR-012: el detalle del volumen 3 trae series.id, series.name y volumeNumber = 3")
+	void shouldExposeSeriesReferenceAndVolumeNumberInVolumeDetail() {
+		Series series = CatalogFixtures.series("Dragon Ball", "Descripcion");
+		Product product = CatalogFixtures.product("Dragon Ball 3", new Isbn(CatalogFixtures.VALID_ISBN13), series, 3,
+				List.<Author>of(CatalogFixtures.author("Akira Toriyama")), List.<Genre>of(CatalogFixtures.genre("Accion")));
+		when(this.service.detail(product.getId())).thenReturn(product);
+
+		MvcTestResult result = this.mvc.get().uri(PRODUCTS + "/" + product.getId()).exchange();
+
+		assertThat(result).hasStatusOk();
+		JsonNode body = json(result);
+		assertThat(body.path("series").path("id").asString()).isEqualTo(series.getId().toString());
+		assertThat(body.path("series").path("name").asString()).isEqualTo("Dragon Ball");
+		assertThat(body.path("volumeNumber").asInt()).isEqualTo(3);
 	}
 
 	private void stub(List<Product> products, long total) {
